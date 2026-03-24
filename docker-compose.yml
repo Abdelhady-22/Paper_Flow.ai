@@ -2,6 +2,27 @@ version: "3.9"
 
 services:
 
+  # ── Application ────────────────────────────────────────────
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports: ["8000:8000"]
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    volumes:
+      - upload_storage:/app/storage/uploads
+      - agent_storage:/app/storage/agent_downloads
+    networks: [app_network]
+    restart: unless-stopped
+
+  # ── PostgreSQL ─────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
     environment:
@@ -11,41 +32,54 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports: ["5432:5432"]
-    networks: [app_network]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-admin}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks: [app_network]
+    restart: unless-stopped
 
+  # ── Qdrant Vector DB ───────────────────────────────────────
   qdrant:
     image: qdrant/qdrant:latest
     ports: ["6333:6333", "6334:6334"]
     volumes:
       - qdrant_data:/qdrant/storage
     networks: [app_network]
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:6333/healthz || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+    restart: unless-stopped
 
+  # ── Redis ──────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     ports: ["6379:6379"]
-    volumes: [redis_data:/data]
+    volumes:
+      - redis_data:/data
     command: redis-server --appendonly yes
-    networks: [app_network]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks: [app_network]
+    restart: unless-stopped
+
+  # ── Frontend ────────────────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports: ["3000:80"]
+    depends_on: [gateway]
+    networks: [app_network]
+    restart: unless-stopped
 
 volumes:
   postgres_data:
   qdrant_data:
   redis_data:
+  upload_storage:
+  agent_storage:
 
 networks:
   app_network:

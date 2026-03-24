@@ -1,0 +1,171 @@
+# CI/CD — Build and Push Docker Images
+# Section 29.7 of the guide
+
+name: CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: docker.io
+  IMAGE_PREFIX: ${{ secrets.DOCKERHUB_USERNAME }}/research-paper-assistant
+
+jobs:
+  # ────────────────────────────────────────────────────────────
+  # JOB 1: Lint & Test (runs on every push and PR)
+  # ────────────────────────────────────────────────────────────
+  ci:
+    name: Lint and Test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: test_db
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r backend/requirements-dev.txt
+
+      - name: Run Ruff linter
+        run: ruff check backend/ --output-format=github
+
+      - name: Run Black formatter check
+        run: black --check backend/
+
+      - name: Run type checking (mypy)
+        run: mypy backend/services/ backend/shared/ --ignore-missing-imports
+
+      - name: Run unit tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_db
+          REDIS_URL: redis://localhost:6379
+          QDRANT_HOST: localhost
+          QDRANT_PORT: 6333
+          LLM_PROVIDER: groq
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          SUMMARIZATION_MODE: model
+          QA_MODE: model
+          TRANSLATION_EN_AR_MODE: model
+          TRANSLATION_AR_EN_MODE: model
+          OCR_ENGINE: paddle
+          STT_PROVIDER: whisper
+          TTS_PROVIDER: edge_tts
+        run: |
+          cd backend
+          pytest services/ shared/ \
+            --cov=services \
+            --cov=shared \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            -v
+
+      - name: Upload coverage report
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./backend/coverage.xml
+          fail_ci_if_error: false
+
+      - name: Run security scan (bandit)
+        run: bandit -r backend/services/ backend/shared/ -ll --exit-zero
+
+      - name: Check for dependency vulnerabilities (safety)
+        run: safety check --full-report || true
+
+  # ────────────────────────────────────────────────────────────
+  # JOB 2: Build and Push Docker Image (only on push to main)
+  # ────────────────────────────────────────────────────────────
+  build-and-push:
+    name: Build and Push
+    runs-on: ubuntu-latest
+    needs: ci
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract metadata (tags and labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_PREFIX }}
+          tags: |
+            type=sha,prefix=sha-,format=short
+            type=ref,event=branch
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+  # ────────────────────────────────────────────────────────────
+  # JOB 3: Notify on completion
+  # ────────────────────────────────────────────────────────────
+  notify:
+    name: Notify Result
+    runs-on: ubuntu-latest
+    needs: [ci, build-and-push]
+    if: always()
+
+    steps:
+      - name: Report success
+        if: needs.build-and-push.result == 'success'
+        run: |
+          echo " Image built and pushed successfully."
+          echo "Image pushed with tags: latest + sha-$(echo ${{ github.sha }} | cut -c1-7)"
+
+      - name: Report failure
+        if: needs.build-and-push.result == 'failure' || needs.ci.result == 'failure'
+        run: |
+          echo " CI/CD pipeline failed. Check logs above."
+          exit 1
