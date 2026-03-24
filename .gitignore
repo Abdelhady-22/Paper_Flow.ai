@@ -1,0 +1,83 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+*.whl
+.eggs/
+*.manifest
+*.spec
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.settings/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Docker
+docker-compose.override.yml
+
+# Node / Frontend
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.cache/
+frontend/build/
+
+# ML Models (downloaded at runtime)
+models/
+*.pt
+*.bin
+*.onnx
+*.safetensors
+
+# Storage (runtime data)
+storage/
+uploads/
+agent_downloads/
+
+# Testing
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+
+# Alembic
+infrastructure/postgres/migrations/versions/__pycache__/
+
+# Redis dump
+dump.rdb
+
+# Misc
+*.bak
+*.tmp
+*.temp
