@@ -46,7 +46,7 @@ Microservices architecture with 8 backend services + API Gateway:
 
 ```bash
 # 1. Clone the repository
-git clone <repo-url>
+git clone https://github.com/Abdelhady-22/Paper_Flow.ai.git
 cd Paper_Flow.ai
 
 # 2. Copy environment config
@@ -106,9 +106,18 @@ Paper_Flow.ai/
 │   ├── requirements-dev.txt
 │   ├── settings.py
 │   └── alembic.ini
-├── frontend/                        ← React app (coming soon)
+├── frontend/
+│   ├── src/
+│   │   ├── pages/               ← Welcome, Dashboard, Chat, Research, Tools
+│   │   ├── components/          ← Navbar, Footer, PageTransition
+│   │   ├── context/             ← ThemeContext (dark/light)
+│   │   ├── store/               ← Redux Toolkit slices
+│   │   ├── utils/               ← Motion variants, file validator
+│   │   └── api/                 ← Axios client
+│   └── package.json
 ├── docker-compose.yml
 ├── .env.example
+├── QUICKSTART.md
 └── .gitignore
 ```
 

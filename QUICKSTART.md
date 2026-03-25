@@ -21,7 +21,7 @@ One command to run everything:
 
 ```bash
 # 1. Clone
-git clone https://github.com/YOUR_USERNAME/Paper_Flow.ai.git
+git clone https://github.com/Abdelhady-22/Paper_Flow.ai.git
 cd Paper_Flow.ai
 
 # 2. Create .env from template
@@ -173,11 +173,12 @@ Paper_Flow.ai/
 │   └── requirements.txt
 ├── frontend/
 │   ├── src/
-│   │   ├── pages/            # Landing, Chat, Tools, Discover
-│   │   ├── components/       # Navbar, Sidebar, panels
+│   │   ├── pages/            # Welcome, Dashboard, Chat, Research, Summarize, Translate, OCR, Q&A, Discover
+│   │   ├── components/       # Navbar, Footer, PageTransition
+│   │   ├── context/          # ThemeContext (dark/light toggle)
 │   │   ├── store/            # Redux Toolkit slices
 │   │   ├── api/              # Axios client
-│   │   └── utils/            # File validator
+│   │   └── utils/            # Motion variants, file validator
 │   └── package.json
 ├── Dockerfile                # Backend
 ├── Dockerfile.frontend       # Frontend (multi-stage Nginx)
