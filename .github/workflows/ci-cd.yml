@@ -136,7 +136,7 @@ jobs:
             type=ref,event=branch
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
 
-      - name: Build and push
+      - name: Build and push backend
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -144,6 +144,28 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+      - name: Extract frontend metadata
+        id: meta-frontend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_PREFIX }}-frontend
+          tags: |
+            type=sha,prefix=sha-,format=short
+            type=ref,event=branch
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.frontend
+          push: true
+          tags: ${{ steps.meta-frontend.outputs.tags }}
+          labels: ${{ steps.meta-frontend.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64,linux/arm64
@@ -161,8 +183,8 @@ jobs:
       - name: Report success
         if: needs.build-and-push.result == 'success'
         run: |
-          echo " Image built and pushed successfully."
-          echo "Image pushed with tags: latest + sha-$(echo ${{ github.sha }} | cut -c1-7)"
+          echo "Backend + Frontend images built and pushed successfully."
+          echo "Tags: latest + sha-$(echo ${{ github.sha }} | cut -c1-7)"
 
       - name: Report failure
         if: needs.build-and-push.result == 'failure' || needs.ci.result == 'failure'
