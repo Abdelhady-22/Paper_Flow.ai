@@ -22,12 +22,12 @@ redis[hiredis]==5.0.1
 qdrant-client==1.7.0
 
 # ── LLM & AI ─────────────────────────────────────────────────
-litellm==1.30.0
-langchain==0.1.6
-langchain-community==0.0.20
+litellm>=1.30.0
+langchain>=0.1.6,<0.2
+langchain-community>=0.0.20,<0.1
 
 # ── AI Agents ─────────────────────────────────────────────────
-crewai==0.114.0
+crewai>=0.80.0
 
 # ── ML Models ─────────────────────────────────────────────────
 torch==2.1.2
