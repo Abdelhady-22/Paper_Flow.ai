@@ -11,8 +11,7 @@ Implements the full agent pipeline from Section 8:
 Pipeline: keyword_agent → search_agent → download_agent → import_agent → report_agent
 """
 
-from crewai import Agent, Task, Crew, Process
-from shared.llm_client.client import LLMClient
+from crewai import Agent, Task
 from shared.llm_client.providers import get_provider_model
 from shared.logger.logger import get_logger
 from settings import settings

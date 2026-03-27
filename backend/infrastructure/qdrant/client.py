@@ -5,15 +5,10 @@ Provides async Qdrant client for storing and searching paper chunk embeddings.
 Collection: 'papers' with 384-dimensional vectors (all-MiniLM-L6-v2).
 """
 
-from qdrant_client import QdrantClient
 from qdrant_client.async_qdrant_client import AsyncQdrantClient
 from qdrant_client.models import (
     Distance,
     VectorParams,
-    PointStruct,
-    Filter,
-    FieldCondition,
-    MatchValue,
 )
 from settings import settings
 from shared.logger.logger import get_logger

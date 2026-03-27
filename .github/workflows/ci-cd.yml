@@ -90,25 +90,19 @@ jobs:
           TTS_PROVIDER: edge_tts
         run: |
           cd backend
-          set +e
-          pytest services/ shared/ \
+          pytest tests/ services/ shared/ \
             --cov=services \
             --cov=shared \
             --cov-report=xml \
             --cov-report=term-missing \
             -v
-          exit_code=$?
-          if [ $exit_code -eq 5 ]; then
-            echo "No tests collected — treating as success for scaffold code"
-            exit 0
-          fi
-          exit $exit_code
 
       - name: Upload coverage report
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           file: ./backend/coverage.xml
           fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Run security scan (bandit)
         run: bandit -r backend/services/ backend/shared/ -ll --exit-zero
@@ -149,7 +143,7 @@ jobs:
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
 
       - name: Build and push backend
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
@@ -171,7 +165,7 @@ jobs:
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
 
       - name: Build and push frontend
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile.frontend

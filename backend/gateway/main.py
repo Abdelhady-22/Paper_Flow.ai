@@ -120,8 +120,8 @@ async def root():
 
 
 # ── WebSocket ─────────────────────────────────────────────────
-from fastapi import WebSocket
-from shared.progress.tracker import websocket_progress_handler
+from fastapi import WebSocket  # noqa: E402
+from shared.progress.tracker import websocket_progress_handler  # noqa: E402
 
 
 @app.websocket("/ws/progress")
@@ -131,15 +131,15 @@ async def progress_ws(websocket: WebSocket):
 
 
 # ── Route Mounting ────────────────────────────────────────────
-from services.ocr_service.routes.ocr_routes import router as ocr_router
-from services.summarization_service.routes.summary_routes import router as summary_router
-from services.translation_service.routes.translation_routes import router as translation_router
-from services.qa_service.routes.qa_routes import router as qa_router
-from services.chatbot_service.routes.chat_routes import router as chat_router
-from services.chatbot_service.routes.action_routes import router as action_router
-from services.voice_service.routes.voice_routes import router as voice_router
-from services.export_service.routes.export_routes import router as export_router
-from services.agent_service.routes.agent_routes import router as agent_router
+from services.ocr_service.routes.ocr_routes import router as ocr_router  # noqa: E402
+from services.summarization_service.routes.summary_routes import router as summary_router  # noqa: E402
+from services.translation_service.routes.translation_routes import router as translation_router  # noqa: E402
+from services.qa_service.routes.qa_routes import router as qa_router  # noqa: E402
+from services.chatbot_service.routes.chat_routes import router as chat_router  # noqa: E402
+from services.chatbot_service.routes.action_routes import router as action_router  # noqa: E402
+from services.voice_service.routes.voice_routes import router as voice_router  # noqa: E402
+from services.export_service.routes.export_routes import router as export_router  # noqa: E402
+from services.agent_service.routes.agent_routes import router as agent_router  # noqa: E402
 
 app.include_router(ocr_router, prefix="/api/v1")
 app.include_router(summary_router, prefix="/api/v1")

@@ -5,10 +5,8 @@ Centralized configuration loaded from environment variables via Pydantic Setting
 All services import settings from this module.
 """
 
-import os
 from typing import Optional
 from pydantic_settings import BaseSettings
-from pydantic import Field
 
 
 class Settings(BaseSettings):

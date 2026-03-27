@@ -6,6 +6,7 @@ Includes Redis caching for TTS audio responses.
 """
 
 import hashlib
+from typing import Optional
 from services.voice_service.utils.provider_selector import VoiceProviderSelector
 from services.voice_service.models.schemas import STTResponse, TTSResponse
 from shared.security.file_validator import FileValidator
@@ -20,7 +21,7 @@ file_validator = FileValidator()
 
 class VoiceService:
     async def speech_to_text(
-        self, audio_bytes: bytes, provider: str = None, language: str = "en"
+        self, audio_bytes: bytes, provider: Optional[str] = None, language: str = "en"
     ) -> STTResponse:
         provider_name = provider or settings.STT_PROVIDER
         stt = provider_selector.get_stt(provider_name)
@@ -29,12 +30,12 @@ class VoiceService:
         return result
 
     async def text_to_speech(
-        self, text: str, provider: str = None, language: str = "en"
+        self, text: str, provider: Optional[str] = None, language: str = "en"
     ) -> tuple[bytes, TTSResponse]:
         provider_name = provider or settings.TTS_PROVIDER
 
         # Check Redis cache
-        text_hash = hashlib.md5(f"{text}:{language}:{provider_name}".encode()).hexdigest()
+        text_hash = hashlib.md5(f"{text}:{language}:{provider_name}".encode(), usedforsecurity=False).hexdigest()
         cache_key = f"tts:{text_hash}"
         redis = get_redis_binary_client()
         try:

@@ -101,7 +101,7 @@ class LLMClient:
                 "LLM rate limit reached. Please try again shortly."
             )
 
-        except litellm.exceptions.Timeout as e:
+        except litellm.exceptions.Timeout:
             logger.error(
                 "llm_timeout",
                 provider=self.provider,
@@ -111,7 +111,7 @@ class LLMClient:
                 "The AI request timed out. Please try again."
             )
 
-        except litellm.exceptions.AuthenticationError as e:
+        except litellm.exceptions.AuthenticationError:
             logger.error("llm_auth_error", provider=self.provider)
             raise LLMAuthException(
                 "LLM provider authentication failed."

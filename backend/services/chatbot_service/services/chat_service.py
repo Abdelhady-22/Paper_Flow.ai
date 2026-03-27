@@ -62,7 +62,7 @@ class ChatService:
         )
 
         # Check Redis cache
-        prompt_hash = hashlib.md5(content.encode()).hexdigest()
+        prompt_hash = hashlib.md5(content.encode(), usedforsecurity=False).hexdigest()
         redis = get_redis_client()
         cache_key = f"llm:{prompt_hash}"
         cached_response = None

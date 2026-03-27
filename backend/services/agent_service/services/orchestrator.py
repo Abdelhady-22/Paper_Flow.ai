@@ -9,12 +9,8 @@ Falls back to direct pipeline execution when CrewAI is not available.
 """
 
 import uuid
-from typing import Optional, List
-from uuid import UUID
 
 from services.agent_service.models.schemas import (
-    DiscoveryResponse,
-    DiscoveredPaper,
     DiscoveryReport,
 )
 from services.agent_service.utils.semantic_scholar import search_papers
@@ -198,16 +194,16 @@ class AgentOrchestrator:
         failed_imports = sum(1 for i in imported if not i.get("success"))
 
         report_lines = [
-            f"## Discovery Report",
-            f"",
+            "## Discovery Report",
+            "",
             f"**Query**: {query}",
             f"**Keywords**: {keywords}",
             f"**Papers Found**: {len(papers)}",
             f"**Papers Downloaded**: {sum(1 for d in downloaded if d.get('success'))}",
             f"**Papers Imported**: {successful_imports}",
             f"**Failed Imports**: {failed_imports}",
-            f"",
-            f"### Papers Found",
+            "",
+            "### Papers Found",
         ]
 
         for i, paper in enumerate(papers, 1):
