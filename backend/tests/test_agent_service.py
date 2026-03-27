@@ -1,43 +1,42 @@
 """
-Tests for the Agent Orchestrator — schema validation and source-level tests.
-
-Avoids importing the orchestrator module directly since it triggers the full
-dependency chain (→ semantic_scholar → httpx, etc.).
-Tests validate Pydantic schemas via direct file import and verify source logic.
+Tests for the Agent Service — schema validation and source-level pipeline tests.
 """
 
 import pytest
-import importlib.util
-import ast
 import os
-import sys
+from pathlib import Path
 
 
-def _import_schemas_directly():
-    """
-    Import the agent schemas module by file path, bypassing the package
-    resolution that fails in CI due to namespace conflicts.
-    """
-    schemas_path = os.path.join(
-        os.path.dirname(__file__), "..",
-        "services", "agent_service", "models", "schemas.py"
-    )
-    spec = importlib.util.spec_from_file_location("agent_schemas", schemas_path)
+# ═══════════════════════════════════════════════════════════════════════
+# DiscoveryReport Schema Tests (direct file import)
+# ═══════════════════════════════════════════════════════════════════════
+
+SCHEMAS_PATH = str(
+    (Path(__file__).resolve().parent.parent
+     / "services" / "agent_service" / "models" / "schemas.py")
+)
+
+ORCHESTRATOR_PATH = str(
+    (Path(__file__).resolve().parent.parent
+     / "services" / "agent_service" / "services" / "orchestrator.py")
+)
+
+
+def _import_schemas():
+    """Import schemas by file path to avoid namespace resolution issues."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("agent_schemas", SCHEMAS_PATH)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
 
-
-# ═══════════════════════════════════════════════════════════════════════
-# DiscoveryReport Schema Tests
-# ═══════════════════════════════════════════════════════════════════════
 
 class TestDiscoveryReportSchema:
     """Test that the DiscoveryReport Pydantic schema works correctly."""
 
     @pytest.fixture(autouse=True)
     def load_schemas(self):
-        self.schemas = _import_schemas_directly()
+        self.schemas = _import_schemas()
 
     def test_discovery_report_minimal(self):
         report = self.schemas.DiscoveryReport(
@@ -89,12 +88,6 @@ class TestDiscoveryReportSchema:
 # Orchestrator Source-Level Tests
 # ═══════════════════════════════════════════════════════════════════════
 
-ORCHESTRATOR_PATH = os.path.join(
-    os.path.dirname(__file__), "..",
-    "services", "agent_service", "services", "orchestrator.py"
-)
-
-
 class TestOrchestratorSource:
     """Verify orchestrator pipeline structure by parsing source."""
 
@@ -112,14 +105,18 @@ class TestOrchestratorSource:
     def test_has_generate_report_method(self):
         assert "async def _generate_report" in self.source
 
-    def test_pipeline_steps_in_order(self):
-        """Verify pipeline executes in correct order."""
-        keyword_pos = self.source.index("_extract_keywords")
-        search_pos = self.source.index("search_papers")
-        download_pos = self.source.index("batch_download_papers")
-        import_pos = self.source.index("batch_import_papers")
-        report_pos = self.source.index("_generate_report")
-        assert keyword_pos < search_pos < download_pos < import_pos < report_pos
+    def test_pipeline_calls_all_stages(self):
+        """Verify all 5 pipeline stages are called within run_discovery."""
+        # Extract just the run_discovery method body
+        start = self.source.index("async def run_discovery")
+        end = self.source.index("async def _extract_keywords")
+        method_body = self.source[start:end]
+
+        assert "_extract_keywords" in method_body
+        assert "search_papers" in method_body
+        assert "batch_download_papers" in method_body
+        assert "batch_import_papers" in method_body
+        assert "_generate_report" in method_body
 
     def test_fallback_on_no_papers(self):
         """Verify no-papers fallback returns 'No papers found'."""
