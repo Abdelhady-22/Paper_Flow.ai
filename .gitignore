@@ -53,8 +53,8 @@ frontend/dist/
 frontend/.cache/
 frontend/build/
 
-# ML Models (downloaded at runtime)
-models/
+# ML Models (downloaded at runtime — root-level only, not Python packages)
+/models/
 *.pt
 *.bin
 *.onnx
@@ -82,3 +82,6 @@ dump.rdb
 *.bak
 *.tmp
 *.temp
+
+
+error.txt
