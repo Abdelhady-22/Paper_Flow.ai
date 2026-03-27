@@ -40,8 +40,8 @@ nltk==3.8.1
 tiktoken==0.5.2
 
 # ── OCR ───────────────────────────────────────────────────────
-paddleocr==2.7.3
-paddlepaddle==2.6.0
+paddleocr>=2.7.3
+paddlepaddle>=2.6.2
 
 # ── Voice — STT ───────────────────────────────────────────────
 faster-whisper==1.0.1
