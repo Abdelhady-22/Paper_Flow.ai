@@ -24,7 +24,7 @@ qdrant-client==1.7.0
 # ── LLM & AI ─────────────────────────────────────────────────
 litellm==1.30.0
 langchain==0.1.6
-langchain-community==0.0.16
+langchain-community==0.0.20
 
 # ── AI Agents ─────────────────────────────────────────────────
 crewai==0.114.0
