@@ -1,9 +1,21 @@
 """
 Tests for the FastAPI Gateway — health check, root, CORS, and route mounting.
+
+Uses importlib to ensure the gateway.main module is importable before patching.
 """
 
+import sys
 import pytest
-from unittest.mock import patch, AsyncMock
+import importlib
+from unittest.mock import AsyncMock, patch
+
+
+def _import_gateway_main():
+    """
+    Force-import gateway.main so patch() can resolve it.
+    gateway/__init__.py doesn't expose `main`, so we need importlib.
+    """
+    return importlib.import_module("gateway.main")
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -16,16 +28,10 @@ class TestGatewayEndpoints:
     @pytest.fixture(autouse=True)
     def setup_client(self):
         """Create a TestClient for the gateway app."""
-        # Patch infrastructure init to avoid real connections
-        with patch("gateway.main.init_qdrant", new_callable=AsyncMock), \
-             patch("gateway.main.init_redis", new_callable=AsyncMock), \
-             patch("gateway.main.close_db", new_callable=AsyncMock), \
-             patch("gateway.main.close_qdrant", new_callable=AsyncMock), \
-             patch("gateway.main.close_redis", new_callable=AsyncMock):
-            from gateway.main import app
-            from fastapi.testclient import TestClient
-            self.client = TestClient(app, raise_server_exceptions=False)
-            yield
+        gateway_main = _import_gateway_main()
+        from fastapi.testclient import TestClient
+        self.client = TestClient(gateway_main.app, raise_server_exceptions=False)
+        yield
 
     def test_health_check(self):
         response = self.client.get("/health")
@@ -60,44 +66,34 @@ class TestRouteMounting:
     """Verify all service routes are mounted under /api/v1."""
 
     @pytest.fixture(autouse=True)
-    def setup_client(self):
-        with patch("gateway.main.init_qdrant", new_callable=AsyncMock), \
-             patch("gateway.main.init_redis", new_callable=AsyncMock), \
-             patch("gateway.main.close_db", new_callable=AsyncMock), \
-             patch("gateway.main.close_qdrant", new_callable=AsyncMock), \
-             patch("gateway.main.close_redis", new_callable=AsyncMock):
-            from gateway.main import app
-            self.app = app
-            yield
+    def setup_app(self):
+        gateway_main = _import_gateway_main()
+        self.app = gateway_main.app
+        yield
+
+    def _route_paths(self):
+        return [r.path for r in self.app.routes]
 
     def test_routes_include_ocr(self):
-        routes = [r.path for r in self.app.routes]
-        assert any("/api/v1/ocr" in r for r in routes)
+        assert any("/api/v1/ocr" in r for r in self._route_paths())
 
     def test_routes_include_summarize(self):
-        routes = [r.path for r in self.app.routes]
-        assert any("/api/v1/summary" in r or "/api/v1/summarize" in r for r in routes)
+        assert any("/api/v1/summary" in r or "/api/v1/summarize" in r for r in self._route_paths())
 
     def test_routes_include_translate(self):
-        routes = [r.path for r in self.app.routes]
-        assert any("/api/v1/translate" in r or "/api/v1/translation" in r for r in routes)
+        assert any("/api/v1/translate" in r or "/api/v1/translation" in r for r in self._route_paths())
 
     def test_routes_include_chat(self):
-        routes = [r.path for r in self.app.routes]
-        assert any("/api/v1/chat" in r for r in routes)
+        assert any("/api/v1/chat" in r for r in self._route_paths())
 
     def test_routes_include_voice(self):
-        routes = [r.path for r in self.app.routes]
-        assert any("/api/v1/voice" in r or "/api/v1/tts" in r or "/api/v1/stt" in r for r in routes)
+        assert any("/api/v1/voice" in r or "/api/v1/tts" in r or "/api/v1/stt" in r for r in self._route_paths())
 
     def test_routes_include_export(self):
-        routes = [r.path for r in self.app.routes]
-        assert any("/api/v1/export" in r for r in routes)
+        assert any("/api/v1/export" in r for r in self._route_paths())
 
     def test_routes_include_agent(self):
-        routes = [r.path for r in self.app.routes]
-        assert any("/api/v1/agent" in r or "/api/v1/discover" in r for r in routes)
+        assert any("/api/v1/agent" in r or "/api/v1/discover" in r for r in self._route_paths())
 
     def test_routes_include_qa(self):
-        routes = [r.path for r in self.app.routes]
-        assert any("/api/v1/qa" in r for r in routes)
+        assert any("/api/v1/qa" in r for r in self._route_paths())

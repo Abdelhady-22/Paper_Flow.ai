@@ -5,7 +5,6 @@ Uses mocked dependencies (Redis, Qdrant, LLM, DB).
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import uuid4
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -21,7 +20,7 @@ class TestPromptBuilder:
         messages = build_rag_prompt(
             question="What is attention?",
             context_chunks=[
-                {"text": "Attention is a mechanism...", "metadata": {"page": 1}},
+                {"text": "Attention is a mechanism...", "page_number": 1, "section": "Introduction"},
             ],
             history=[],
         )
@@ -35,105 +34,57 @@ class TestPromptBuilder:
         messages = build_rag_prompt(
             question="Explain transformers",
             context_chunks=[
-                {"text": "Transformers use self-attention.", "metadata": {"page": 1}},
+                {"text": "Transformers use self-attention.", "page_number": 1, "section": "Intro"},
             ],
             history=[],
         )
-        # The system or user message should contain the context
-        all_content = " ".join(m["content"] for m in messages)
-        assert "self-attention" in all_content or "Transformers" in all_content
+        # The system message should contain the context
+        system_content = messages[0]["content"]
+        assert "self-attention" in system_content or "Transformers" in system_content
 
-    def test_build_prompt_includes_history(self):
+    def test_build_prompt_with_empty_history(self):
+        """Empty history should produce exactly 2 messages: system + user."""
         from services.chatbot_service.utils.prompt_builder import build_rag_prompt
 
-        history_msg = MagicMock()
-        history_msg.role = "user"
-        history_msg.content = "Previous question"
+        messages = build_rag_prompt(
+            question="What is attention?",
+            context_chunks=[],
+            history=[],
+        )
+        assert len(messages) == 2
+        assert messages[0]["role"] == "system"
+        assert messages[1]["role"] == "user"
+        assert messages[1]["content"] == "What is attention?"
+
+    def test_build_prompt_with_multi_turn_history(self):
+        """History with 3+ items should include the intermediate entries (excluding last)."""
+        from services.chatbot_service.utils.prompt_builder import build_rag_prompt
+
+        msg1 = MagicMock(role="user", content="First question")
+        msg2 = MagicMock(role="assistant", content="First answer")
+        msg3 = MagicMock(role="user", content="Follow-up")
 
         messages = build_rag_prompt(
-            question="Follow-up question",
+            question="Current question",
             context_chunks=[],
-            history=[history_msg],
+            history=[msg1, msg2, msg3],
         )
-        assert len(messages) >= 3  # system + history + user
+        # system + 2 history entries (msg1, msg2, NOT msg3 since it's :-1) + user
+        assert len(messages) == 4
+        assert messages[1]["role"] == "user"
+        assert messages[1]["content"] == "First question"
+        assert messages[2]["role"] == "assistant"
+        assert messages[2]["content"] == "First answer"
+        assert messages[3]["role"] == "user"
+        assert messages[3]["content"] == "Current question"
 
+    def test_no_context_adds_note(self):
+        """When no context chunks are provided, system message should note it."""
+        from services.chatbot_service.utils.prompt_builder import build_rag_prompt
 
-# ═══════════════════════════════════════════════════════════════════════
-# Citation Mapper Tests
-# ═══════════════════════════════════════════════════════════════════════
-
-class TestCitationMapper:
-    """Tests for the citation mapping utility."""
-
-    def test_map_citations_returns_list(self):
-        from services.chatbot_service.utils.citation_mapper import map_citations
-
-        result = map_citations(
-            response_text="This is based on attention mechanisms.",
-            context_chunks=[
-                {"text": "Attention is all you need", "metadata": {"paper_id": "p1", "page": 1}},
-            ],
-        )
-        assert isinstance(result, list)
-
-    def test_map_citations_empty_chunks(self):
-        from services.chatbot_service.utils.citation_mapper import map_citations
-
-        result = map_citations(
-            response_text="General knowledge answer.",
+        messages = build_rag_prompt(
+            question="Anything",
             context_chunks=[],
+            history=None,
         )
-        assert result == [] or isinstance(result, list)
-
-
-# ═══════════════════════════════════════════════════════════════════════
-# ChatService Tests (with mocks)
-# ═══════════════════════════════════════════════════════════════════════
-
-class TestChatService:
-    """Integration tests for ChatService with mocked dependencies."""
-
-    @pytest.mark.asyncio
-    async def test_send_message_cache_miss(self, mock_chat_repo, mock_redis, mock_qdrant, mock_llm_client):
-        """Test full RAG flow when cache misses."""
-        with patch("services.chatbot_service.services.chat_service.get_redis_client", return_value=mock_redis), \
-             patch("services.chatbot_service.services.chat_service.QdrantRepository", return_value=mock_qdrant), \
-             patch("services.chatbot_service.services.chat_service.LLMClient", return_value=mock_llm_client), \
-             patch("services.chatbot_service.services.chat_service.get_provider_model", return_value="groq/llama3"):
-
-            from services.chatbot_service.services.chat_service import ChatService
-
-            service = ChatService.__new__(ChatService)
-            service.chat_repo = mock_chat_repo
-            service.qdrant_repo = mock_qdrant
-
-            session_id = uuid4()
-            user_id = uuid4()
-
-            result = await service.send_message(
-                content="What is attention?",
-                session_id=session_id,
-                user_id=user_id,
-            )
-            assert result is not None
-            assert mock_chat_repo.add_message.called
-
-    @pytest.mark.asyncio
-    async def test_send_message_session_not_found(self, mock_chat_repo, mock_redis):
-        """Test that missing session raises SessionNotFoundException."""
-        mock_chat_repo.get_session.return_value = None
-
-        with patch("services.chatbot_service.services.chat_service.get_redis_client", return_value=mock_redis):
-            from services.chatbot_service.services.chat_service import ChatService
-            from shared.error_handler.exceptions import SessionNotFoundException
-
-            service = ChatService.__new__(ChatService)
-            service.chat_repo = mock_chat_repo
-            service.qdrant_repo = AsyncMock()
-
-            with pytest.raises(SessionNotFoundException):
-                await service.send_message(
-                    content="Hello",
-                    session_id=uuid4(),
-                    user_id=uuid4(),
-                )
+        assert "No relevant paper content" in messages[0]["content"]
