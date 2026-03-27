@@ -160,7 +160,7 @@ class AgentOrchestrator:
     async def _extract_keywords(self, query: str) -> str:
         """Use LLM to extract precise search keywords from a natural language query."""
         try:
-            provider_model = get_provider_model(settings.LLM_PROVIDER)
+            provider_model = get_provider_model(settings.AGENT_LLM_PROVIDER or settings.LLM_PROVIDER)
             client = LLMClient(
                 provider=provider_model,
                 timeout=settings.LLM_TIMEOUT,

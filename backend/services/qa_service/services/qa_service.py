@@ -135,8 +135,9 @@ class QAService:
         return result
 
     async def _generate_llm(self, text: str, num_questions: int) -> List[QAPair]:
-        logger.info("qa_llm_start", provider=settings.LLM_PROVIDER)
-        provider_model = get_provider_model(settings.LLM_PROVIDER)
+        _provider = settings.QA_LLM_PROVIDER or settings.LLM_PROVIDER
+        logger.info("qa_llm_start", provider=_provider)
+        provider_model = get_provider_model(_provider)
         client = LLMClient(
             provider=provider_model,
             timeout=settings.LLM_TIMEOUT,

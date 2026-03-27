@@ -119,9 +119,10 @@ class TranslationService:
         return result
 
     async def _translate_llm(self, text: str, direction: str) -> str:
-        logger.info("translate_llm_start", direction=direction, provider=settings.LLM_PROVIDER)
+        _provider = settings.TRANSLATION_LLM_PROVIDER or settings.LLM_PROVIDER
+        logger.info("translate_llm_start", direction=direction, provider=_provider)
         target = {"en-ar": "Arabic", "ar-en": "English"}[direction]
-        provider_model = get_provider_model(settings.LLM_PROVIDER)
+        provider_model = get_provider_model(_provider)
         client = LLMClient(
             provider=provider_model,
             timeout=settings.LLM_TIMEOUT,

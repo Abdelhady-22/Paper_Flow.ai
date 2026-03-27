@@ -100,7 +100,7 @@ class ChatService:
         )
 
         # Call LLM
-        provider_model = get_provider_model(settings.LLM_PROVIDER)
+        provider_model = get_provider_model(settings.CHAT_LLM_PROVIDER or settings.LLM_PROVIDER)
         client = LLMClient(
             provider=provider_model,
             timeout=settings.LLM_TIMEOUT,

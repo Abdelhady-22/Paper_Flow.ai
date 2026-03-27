@@ -29,6 +29,13 @@ class Settings(BaseSettings):
 
     # ── LLM Providers ─────────────────────────────────────────
     LLM_PROVIDER: str = "groq"
+
+    # Per-service LLM overrides (fall back to LLM_PROVIDER if not set)
+    CHAT_LLM_PROVIDER: Optional[str] = None
+    SUMMARIZATION_LLM_PROVIDER: Optional[str] = None
+    TRANSLATION_LLM_PROVIDER: Optional[str] = None
+    QA_LLM_PROVIDER: Optional[str] = None
+    AGENT_LLM_PROVIDER: Optional[str] = None
     OPENAI_API_KEY: Optional[str] = None
     GEMINI_API_KEY: Optional[str] = None
     ANTHROPIC_API_KEY: Optional[str] = None

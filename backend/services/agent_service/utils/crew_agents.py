@@ -21,7 +21,7 @@ logger = get_logger(__name__)
 
 def _get_llm_model():
     """Get the LiteLLM model string for CrewAI agents."""
-    return get_provider_model(settings.LLM_PROVIDER)
+    return get_provider_model(settings.AGENT_LLM_PROVIDER or settings.LLM_PROVIDER)
 
 
 # ══════════════════════════════════════════════════════════════
