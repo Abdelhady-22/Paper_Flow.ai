@@ -43,7 +43,7 @@ app = FastAPI(
 app.state.limiter = limiter
 
 # ── Middleware ─────────────────────────────────────────────────
-# CORS
+# Cross-Origin Resource Sharing
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
