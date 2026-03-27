@@ -106,8 +106,8 @@ jobs:
       - name: Run security scan (bandit)
         run: bandit -r backend/services/ backend/shared/ -ll --exit-zero
 
-      - name: Check for dependency vulnerabilities (safety)
-        run: safety check --full-report || true
+      - name: Check for dependency vulnerabilities (pip-audit)
+        run: pip-audit || true
 
   # ────────────────────────────────────────────────────────────
   # JOB 2: Build and Push Docker Image (only on push to main)
