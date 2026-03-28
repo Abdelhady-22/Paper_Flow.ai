@@ -17,7 +17,7 @@ from services.agent_service.utils.semantic_scholar import search_papers
 from services.agent_service.utils.pdf_downloader import batch_download_papers
 from services.agent_service.utils.import_pipeline import batch_import_papers
 from shared.llm_client.client import LLMClient
-from shared.llm_client.providers import get_provider_model
+from shared.llm_client.providers import get_provider_model, get_provider_api_key
 from shared.progress.tracker import progress_tracker
 from shared.logger.logger import get_logger
 from settings import settings
@@ -160,11 +160,13 @@ class AgentOrchestrator:
     async def _extract_keywords(self, query: str) -> str:
         """Use LLM to extract precise search keywords from a natural language query."""
         try:
-            provider_model = get_provider_model(settings.AGENT_LLM_PROVIDER or settings.LLM_PROVIDER)
+            _provider_key = settings.AGENT_LLM_PROVIDER or settings.LLM_PROVIDER
+            provider_model = get_provider_model(_provider_key)
             client = LLMClient(
                 provider=provider_model,
                 timeout=settings.LLM_TIMEOUT,
                 max_retries=settings.LLM_MAX_RETRIES,
+                api_key=get_provider_api_key(_provider_key),
             )
             response = await client.complete(
                 system=(

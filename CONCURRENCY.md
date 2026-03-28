@@ -6,8 +6,8 @@ Paper Flow uses **Python's `asyncio`** for all concurrency — there are no thre
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    FastAPI (uvicorn)                     │
-│              Single-threaded async event loop            │
+│                    FastAPI (uvicorn)                    │
+│              Single-threaded async event loop           │
 ├─────────────┬──────────────┬────────────────────────────┤
 │  Request 1  │  Request 2   │  Request 3 ...             │
 │  (async)    │  (async)     │  (async)                   │
@@ -15,8 +15,8 @@ Paper Flow uses **Python's `asyncio`** for all concurrency — there are no thre
        │             │                    │
        ▼             ▼                    ▼
   ┌─────────┐  ┌──────────┐  ┌─────────────────────┐
-  │ LLM API │  │ Redis    │  │ Qdrant / PostgreSQL  │
-  │ (Groq)  │  │ Pub/Sub  │  │ (async drivers)      │
+  │ LLM API │  │ Redis    │  │ Qdrant / PostgreSQL │
+  │ (Groq)  │  │ Pub/Sub  │  │ (async drivers)     │
   └─────────┘  └──────────┘  └─────────────────────┘
 ```
 

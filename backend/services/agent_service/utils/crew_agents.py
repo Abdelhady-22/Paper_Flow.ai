@@ -11,8 +11,9 @@ Implements the full agent pipeline from Section 8:
 Pipeline: keyword_agent → search_agent → download_agent → import_agent → report_agent
 """
 
+import os
 from crewai import Agent, Task
-from shared.llm_client.providers import get_provider_model
+from shared.llm_client.providers import get_provider_model, get_provider_api_key
 from shared.logger.logger import get_logger
 from settings import settings
 
@@ -21,7 +22,12 @@ logger = get_logger(__name__)
 
 def _get_llm_model():
     """Get the LiteLLM model string for CrewAI agents."""
-    return get_provider_model(settings.AGENT_LLM_PROVIDER or settings.LLM_PROVIDER)
+    _provider_key = settings.AGENT_LLM_PROVIDER or settings.LLM_PROVIDER
+    # CrewAI uses env vars for API keys; set the correct one
+    api_key = get_provider_api_key(_provider_key)
+    if api_key:
+        os.environ["GROQ_API_KEY"] = api_key
+    return get_provider_model(_provider_key)
 
 
 # ══════════════════════════════════════════════════════════════

@@ -16,7 +16,7 @@ from fastapi import Depends
 from services.qa_service.repository.qa_repo import QARepository
 from services.qa_service.models.schemas import QAResponse, QAPair
 from shared.llm_client.client import LLMClient
-from shared.llm_client.providers import get_provider_model
+from shared.llm_client.providers import get_provider_model, get_provider_api_key
 from shared.llm_client.mode_selector import ModeSelector
 from shared.chunking.text_chunker import chunk_text
 from shared.error_handler.exceptions import PaperNotFoundException
@@ -135,13 +135,14 @@ class QAService:
         return result
 
     async def _generate_llm(self, text: str, num_questions: int) -> List[QAPair]:
-        _provider = settings.QA_LLM_PROVIDER or settings.LLM_PROVIDER
-        logger.info("qa_llm_start", provider=_provider)
-        provider_model = get_provider_model(_provider)
+        _provider_key = settings.QA_LLM_PROVIDER or settings.LLM_PROVIDER
+        logger.info("qa_llm_start", provider=_provider_key)
+        provider_model = get_provider_model(_provider_key)
         client = LLMClient(
             provider=provider_model,
             timeout=settings.LLM_TIMEOUT,
             max_retries=settings.LLM_MAX_RETRIES,
+            api_key=get_provider_api_key(_provider_key),
         )
 
         max_chars = 12000

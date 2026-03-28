@@ -19,7 +19,7 @@ from services.chatbot_service.models.schemas import ChatMessageResponse, Citatio
 from services.chatbot_service.utils.prompt_builder import build_rag_prompt
 from services.chatbot_service.utils.citation_mapper import map_citations
 from shared.llm_client.client import LLMClient
-from shared.llm_client.providers import get_provider_model
+from shared.llm_client.providers import get_provider_model, get_provider_api_key
 from shared.error_handler.exceptions import SessionNotFoundException
 from shared.logger.logger import get_logger
 from settings import settings
@@ -100,11 +100,13 @@ class ChatService:
         )
 
         # Call LLM
-        provider_model = get_provider_model(settings.CHAT_LLM_PROVIDER or settings.LLM_PROVIDER)
+        _provider_key = settings.CHAT_LLM_PROVIDER or settings.LLM_PROVIDER
+        provider_model = get_provider_model(_provider_key)
         client = LLMClient(
             provider=provider_model,
             timeout=settings.LLM_TIMEOUT,
             max_retries=settings.LLM_MAX_RETRIES,
+            api_key=get_provider_api_key(_provider_key),
         )
         response_text = await client.complete_chat(
             messages=messages,

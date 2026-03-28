@@ -30,10 +30,11 @@ class LLMClient:
     All calls include rate limiting, timeout, retry, and error handling.
     """
 
-    def __init__(self, provider: str, timeout: int = 30, max_retries: int = 3):
+    def __init__(self, provider: str, timeout: int = 30, max_retries: int = 3, api_key: Optional[str] = None):
         self.provider = provider
         self.timeout = timeout
         self.max_retries = max_retries
+        self.api_key = api_key  # Per-service API key override
 
         # LiteLLM global settings
         litellm.set_verbose = False
@@ -74,7 +75,7 @@ class LLMClient:
                 prompt_len=len(prompt),
             )
 
-            response = await acompletion(
+            kwargs = dict(
                 model=self.provider,
                 messages=messages,
                 temperature=temperature,
@@ -82,6 +83,10 @@ class LLMClient:
                 timeout=self.timeout,
                 num_retries=self.max_retries,
             )
+            if self.api_key:
+                kwargs["api_key"] = self.api_key
+
+            response = await acompletion(**kwargs)
 
             content = response.choices[0].message.content
             logger.info(

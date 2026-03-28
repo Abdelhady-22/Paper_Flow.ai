@@ -38,8 +38,13 @@ class Settings(BaseSettings):
     AGENT_LLM_PROVIDER: Optional[str] = None
     OPENAI_API_KEY: Optional[str] = None
     GEMINI_API_KEY: Optional[str] = None
+    GEMINI_API_KEY_2: Optional[str] = None
     ANTHROPIC_API_KEY: Optional[str] = None
     GROQ_API_KEY: Optional[str] = None
+    GROQ_API_KEY_2: Optional[str] = None
+    GROQ_API_KEY_3: Optional[str] = None
+    GROQ_API_KEY_4: Optional[str] = None
+    GROQ_API_KEY_5: Optional[str] = None
     COHERE_API_KEY: Optional[str] = None
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_CLOUD_BASE_URL: Optional[str] = None

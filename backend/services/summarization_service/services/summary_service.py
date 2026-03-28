@@ -14,7 +14,7 @@ from fastapi import Depends
 from services.summarization_service.repository.summary_repo import SummaryRepository
 from services.summarization_service.models.schemas import SummaryResponse
 from shared.llm_client.client import LLMClient
-from shared.llm_client.providers import get_provider_model
+from shared.llm_client.providers import get_provider_model, get_provider_api_key
 from shared.llm_client.mode_selector import ModeSelector
 from shared.chunking.text_chunker import chunk_text
 from shared.error_handler.exceptions import PaperNotFoundException
@@ -131,13 +131,14 @@ class SummarizationService:
 
     async def _summarize_llm(self, text: str) -> str:
         """Summarize using LLM via LiteLLM."""
-        _provider = settings.SUMMARIZATION_LLM_PROVIDER or settings.LLM_PROVIDER
-        logger.info("summarize_llm_start", provider=_provider)
-        provider_model = get_provider_model(_provider)
+        _provider_key = settings.SUMMARIZATION_LLM_PROVIDER or settings.LLM_PROVIDER
+        logger.info("summarize_llm_start", provider=_provider_key)
+        provider_model = get_provider_model(_provider_key)
         client = LLMClient(
             provider=provider_model,
             timeout=settings.LLM_TIMEOUT,
             max_retries=settings.LLM_MAX_RETRIES,
+            api_key=get_provider_api_key(_provider_key),
         )
 
         # Truncate text if too long for context window
@@ -159,5 +160,5 @@ Text:
             temperature=settings.LLM_TEMPERATURE,
             max_tokens=settings.LLM_MAX_TOKENS,
         )
-        logger.info("summarize_llm_complete", provider=_provider)
+        logger.info("summarize_llm_complete", provider=_provider_key)
         return summary

@@ -14,7 +14,7 @@ from fastapi import Depends
 from services.translation_service.repository.translation_repo import TranslationRepository
 from services.translation_service.models.schemas import TranslationResponse
 from shared.llm_client.client import LLMClient
-from shared.llm_client.providers import get_provider_model
+from shared.llm_client.providers import get_provider_model, get_provider_api_key
 from shared.llm_client.mode_selector import ModeSelector
 from shared.chunking.text_chunker import chunk_text
 from shared.error_handler.exceptions import PaperNotFoundException
@@ -119,14 +119,15 @@ class TranslationService:
         return result
 
     async def _translate_llm(self, text: str, direction: str) -> str:
-        _provider = settings.TRANSLATION_LLM_PROVIDER or settings.LLM_PROVIDER
-        logger.info("translate_llm_start", direction=direction, provider=_provider)
+        _provider_key = settings.TRANSLATION_LLM_PROVIDER or settings.LLM_PROVIDER
+        logger.info("translate_llm_start", direction=direction, provider=_provider_key)
         target = {"en-ar": "Arabic", "ar-en": "English"}[direction]
-        provider_model = get_provider_model(_provider)
+        provider_model = get_provider_model(_provider_key)
         client = LLMClient(
             provider=provider_model,
             timeout=settings.LLM_TIMEOUT,
             max_retries=settings.LLM_MAX_RETRIES,
+            api_key=get_provider_api_key(_provider_key),
         )
 
         max_chars = 12000
