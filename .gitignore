@@ -59,10 +59,10 @@ frontend/build/
 *.onnx
 *.safetensors
 
-# Storage (runtime data)
-storage/
-uploads/
-agent_downloads/
+# Storage (runtime data — root-level only, not Python packages)
+/storage/
+/uploads/
+/agent_downloads/
 
 # Testing
 .coverage
@@ -81,7 +81,6 @@ dump.rdb
 *.bak
 *.tmp
 *.temp
-
 
 error.txt
 /New folder
