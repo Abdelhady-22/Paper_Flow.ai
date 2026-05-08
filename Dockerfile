@@ -6,6 +6,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     gcc g++ libpq-dev curl \
     libgl1 libglib2.0-0 libsm6 libxrender1 libxext6 \
+    libmagic1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Upgrade pip to avoid resolver issues
