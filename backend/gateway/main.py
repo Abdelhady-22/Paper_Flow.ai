@@ -20,7 +20,7 @@ from shared.logger.logger import setup_logging, get_logger
 from shared.logger.middleware import RequestLoggingMiddleware
 from shared.error_handler.handler import register_exception_handlers
 from shared.rate_limiter.api_limiter import limiter
-from infrastructure.postgres.database import close_db
+from infrastructure.postgres.database import close_db, init_db
 from infrastructure.qdrant.client import init_qdrant, close_qdrant
 from infrastructure.redis.client import init_redis, close_redis
 
@@ -75,6 +75,9 @@ async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
 @app.on_event("startup")
 async def startup():
     logger.info("gateway_starting", version="1.0.0", debug=settings.DEBUG)
+
+    # Create database tables (dev mode — use Alembic in production)
+    await init_db()
 
     # Initialize infrastructure connections
     app.state.qdrant = await init_qdrant()
