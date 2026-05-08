@@ -1,27 +1,66 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import api from '../api/client';
 import Navbar from '../components/Navbar';
 import PageTransition from '../components/PageTransition';
-import { Languages, ArrowLeft, Loader, Download, Copy, ArrowLeftRight } from 'lucide-react';
+import { Languages, ArrowLeft, Loader, Copy, ArrowLeftRight, Upload, FileText, AlertCircle } from 'lucide-react';
+
+const getUserId = () => {
+  let uid = localStorage.getItem('pf_user_id');
+  if (!uid) { uid = crypto.randomUUID(); localStorage.setItem('pf_user_id', uid); }
+  return uid;
+};
 
 export default function TranslatePage() {
   const navigate = useNavigate();
-  const [inputText, setInputText] = useState('');
+  const fileRef = useRef<HTMLInputElement>(null);
   const [result, setResult] = useState('');
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [direction, setDirection] = useState<'en-ar' | 'ar-en'>('en-ar');
+  const [fileName, setFileName] = useState('');
+  const [paperId, setPaperId] = useState('');
+  const [error, setError] = useState('');
 
-  const handleTranslate = async () => {
-    if (!inputText.trim()) return;
-    setLoading(true);
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileName(file.name);
+    setUploading(true);
+    setError('');
     setResult('');
     try {
-      const res = await api.post('/translate/', { text: inputText, direction });
-      setResult(res.data.translated_text || res.data.translation || res.data.result || JSON.stringify(res.data));
-    } catch {
-      setResult('Backend is unavailable. Please ensure the gateway is running on port 8000.');
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await api.post('/ocr/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        params: { user_id: getUserId(), engine: 'paddle', language: direction === 'ar-en' ? 'ar' : 'en' },
+      });
+      const data = res.data?.data || res.data;
+      setPaperId(data?.paper_id || '');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleTranslate = async () => {
+    if (!paperId) { setError('Please upload a paper first'); return; }
+    setLoading(true);
+    setResult('');
+    setError('');
+    try {
+      const res = await api.post('/translate/', {
+        paper_id: paperId,
+        direction,
+        mode: 'llm',
+      }, { params: { user_id: getUserId() } });
+      const data = res.data?.data || res.data;
+      setResult(data?.content || data?.translated_text || JSON.stringify(data));
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Translation failed');
     } finally {
       setLoading(false);
     }
@@ -40,7 +79,7 @@ export default function TranslatePage() {
               <h1 style={{ display: 'flex', alignItems: 'center', gap: 12 }} className="gradient-text">
                 <Languages size={28} /> Text Translator
               </h1>
-              <p className="header-subtitle">Translate research texts between English and Arabic</p>
+              <p className="header-subtitle">Translate research papers between English and Arabic</p>
             </div>
           </div>
 
@@ -66,14 +105,34 @@ export default function TranslatePage() {
           <div className="tool-content-grid">
             <motion.div className="tool-input-card" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
               <div className="card-header">
-                <h3>{direction === 'en-ar' ? 'English Text' : 'النص العربي'}</h3>
+                <h3>Upload Paper</h3>
               </div>
-              <textarea className="tool-textarea" placeholder={direction === 'en-ar' ? 'Enter English text...' : 'أدخل النص العربي...'}
-                value={inputText} onChange={e => setInputText(e.target.value)} rows={10}
-                dir={direction === 'ar-en' ? 'rtl' : 'ltr'}
-              />
-              <button className="btn-process" onClick={handleTranslate} disabled={loading || !inputText.trim()}>
-                {loading ? <><Loader size={18} className="spin" /> Translating...</> : 'Translate'}
+              <div onClick={() => fileRef.current?.click()} style={{
+                border: '2px dashed var(--current-border)', borderRadius: 12, padding: 32,
+                textAlign: 'center', cursor: 'pointer', marginBottom: 16,
+                background: 'rgba(255,255,255,0.02)',
+              }}>
+                <Upload size={32} style={{ color: 'var(--color-primary-cyan)', marginBottom: 8 }} />
+                <p style={{ margin: 0, fontSize: 14 }}>Click to upload PDF, DOCX, or Image</p>
+              </div>
+              <input type="file" ref={fileRef} style={{ display: 'none' }} accept=".pdf,.docx,.png,.jpg,.jpeg" onChange={handleFileUpload} />
+
+              {fileName && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'rgba(0,212,255,0.08)', borderRadius: 8, marginBottom: 12, fontSize: 13, color: 'var(--color-primary-cyan)' }}>
+                  <FileText size={14} /> {fileName}
+                  {uploading && <Loader size={14} className="spin" />}
+                  {paperId && <span style={{ marginLeft: 'auto', color: 'var(--color-success)' }}>✓ Ready</span>}
+                </div>
+              )}
+
+              {error && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'rgba(255,50,50,0.08)', borderRadius: 8, marginBottom: 12, fontSize: 13, color: '#ff6b6b' }}>
+                  <AlertCircle size={14} /> {error}
+                </div>
+              )}
+
+              <button className="btn-process" onClick={handleTranslate} disabled={loading || !paperId || uploading}>
+                {loading ? <><Loader size={18} className="spin" /> Translating...</> : uploading ? 'Uploading paper...' : 'Translate'}
               </button>
             </motion.div>
 
@@ -89,13 +148,13 @@ export default function TranslatePage() {
               {!result && !loading && (
                 <div className="empty-output">
                   <Languages size={48} />
-                  <p>Translation will appear here</p>
+                  <p>Upload a paper, then click "Translate"</p>
                 </div>
               )}
               {loading && (
                 <div className="loading-output">
                   <Loader size={40} className="spin" />
-                  <p>Translating your text...</p>
+                  <p>Translating your paper...</p>
                 </div>
               )}
               {result && (
@@ -104,7 +163,7 @@ export default function TranslatePage() {
                   border: '1px solid var(--current-border)', lineHeight: 1.8,
                   direction: direction === 'en-ar' ? 'rtl' : 'ltr',
                   fontFamily: direction === 'en-ar' ? 'var(--font-arabic)' : 'var(--font-primary)',
-                  fontSize: 16,
+                  fontSize: 16, whiteSpace: 'pre-wrap',
                 }}>
                   {result}
                 </div>

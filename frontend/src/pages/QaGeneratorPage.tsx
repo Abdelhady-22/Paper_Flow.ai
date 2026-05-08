@@ -1,39 +1,75 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import api from '../api/client';
 import Navbar from '../components/Navbar';
 import PageTransition from '../components/PageTransition';
-import { HelpCircle, ArrowLeft, Loader, Download, ChevronDown, ChevronUp } from 'lucide-react';
+import { HelpCircle, ArrowLeft, Loader, Download, ChevronDown, ChevronUp, Upload, FileText, AlertCircle } from 'lucide-react';
 
 interface QA {
   question: string;
   answer: string;
 }
 
+const getUserId = () => {
+  let uid = localStorage.getItem('pf_user_id');
+  if (!uid) { uid = crypto.randomUUID(); localStorage.setItem('pf_user_id', uid); }
+  return uid;
+};
+
 export default function QaGeneratorPage() {
   const navigate = useNavigate();
-  const [inputText, setInputText] = useState('');
+  const fileRef = useRef<HTMLInputElement>(null);
   const [qaList, setQaList] = useState<QA[]>([]);
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [count, setCount] = useState(5);
+  const [fileName, setFileName] = useState('');
+  const [paperId, setPaperId] = useState('');
+  const [error, setError] = useState('');
 
-  const handleGenerate = async () => {
-    if (!inputText.trim()) return;
-    setLoading(true);
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileName(file.name);
+    setUploading(true);
+    setError('');
     setQaList([]);
     try {
-      const res = await api.post('/qa/generate', { text: inputText, count });
-      const data = res.data;
-      const pairs = data.qa_pairs || data.questions || data;
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await api.post('/ocr/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        params: { user_id: getUserId(), engine: 'paddle', language: 'en' },
+      });
+      const data = res.data?.data || res.data;
+      setPaperId(data?.paper_id || '');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleGenerate = async () => {
+    if (!paperId) { setError('Please upload a paper first'); return; }
+    setLoading(true);
+    setQaList([]);
+    setError('');
+    try {
+      const res = await api.post('/qa/generate', {
+        paper_id: paperId,
+        mode: 'llm',
+        num_questions: count,
+      }, { params: { user_id: getUserId() } });
+      const data = res.data?.data || res.data;
+      const pairs = data?.qa_pairs || data?.questions || [];
       if (Array.isArray(pairs)) {
         setQaList(pairs.map((p: any) => ({ question: p.question || p.q, answer: p.answer || p.a })));
-      } else {
-        setQaList([{ question: 'Response', answer: JSON.stringify(data) }]);
       }
-    } catch {
-      setQaList([{ question: 'Error', answer: 'Backend is unavailable. Please ensure the gateway is running on port 8000.' }]);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Q&A generation failed');
     } finally {
       setLoading(false);
     }
@@ -59,19 +95,41 @@ export default function QaGeneratorPage() {
               <h1 style={{ display: 'flex', alignItems: 'center', gap: 12 }} className="gradient-text">
                 <HelpCircle size={28} /> Q&A Generator
               </h1>
-              <p className="header-subtitle">Auto-generate question-answer pairs for study guides</p>
+              <p className="header-subtitle">Auto-generate question-answer pairs from research papers</p>
             </div>
           </div>
 
           <div className="tool-content-grid">
             <motion.div className="tool-input-card" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
               <div className="card-header">
-                <h3>Source Text</h3>
+                <h3>Upload Paper</h3>
               </div>
-              <textarea className="tool-textarea" placeholder="Paste your research text here..."
-                value={inputText} onChange={e => setInputText(e.target.value)} rows={10}
-              />
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
+
+              <div onClick={() => fileRef.current?.click()} style={{
+                border: '2px dashed var(--current-border)', borderRadius: 12, padding: 32,
+                textAlign: 'center', cursor: 'pointer', marginBottom: 16,
+                background: 'rgba(255,255,255,0.02)',
+              }}>
+                <Upload size={32} style={{ color: 'var(--color-primary-cyan)', marginBottom: 8 }} />
+                <p style={{ margin: 0, fontSize: 14 }}>Click to upload PDF, DOCX, or Image</p>
+              </div>
+              <input type="file" ref={fileRef} style={{ display: 'none' }} accept=".pdf,.docx,.png,.jpg,.jpeg" onChange={handleFileUpload} />
+
+              {fileName && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'rgba(0,212,255,0.08)', borderRadius: 8, marginBottom: 12, fontSize: 13, color: 'var(--color-primary-cyan)' }}>
+                  <FileText size={14} /> {fileName}
+                  {uploading && <Loader size={14} className="spin" />}
+                  {paperId && <span style={{ marginLeft: 'auto', color: 'var(--color-success)' }}>✓ Ready</span>}
+                </div>
+              )}
+
+              {error && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'rgba(255,50,50,0.08)', borderRadius: 8, marginBottom: 12, fontSize: 13, color: '#ff6b6b' }}>
+                  <AlertCircle size={14} /> {error}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
                 <label style={{ fontSize: 14, color: 'var(--current-text-secondary)' }}>Questions:</label>
                 <select value={count} onChange={e => setCount(Number(e.target.value))} style={{
                   background: 'var(--current-input-bg)', border: '1px solid var(--current-border)',
@@ -81,8 +139,9 @@ export default function QaGeneratorPage() {
                   {[3, 5, 10, 15].map(n => <option key={n} value={n}>{n}</option>)}
                 </select>
               </div>
-              <button className="btn-process" onClick={handleGenerate} disabled={loading || !inputText.trim()}>
-                {loading ? <><Loader size={18} className="spin" /> Generating...</> : 'Generate Q&A'}
+
+              <button className="btn-process" onClick={handleGenerate} disabled={loading || !paperId || uploading}>
+                {loading ? <><Loader size={18} className="spin" /> Generating...</> : uploading ? 'Uploading paper...' : 'Generate Q&A'}
               </button>
             </motion.div>
 
@@ -98,13 +157,13 @@ export default function QaGeneratorPage() {
               {qaList.length === 0 && !loading && (
                 <div className="empty-output">
                   <HelpCircle size={48} />
-                  <p>Generated questions will appear here</p>
+                  <p>Upload a paper, then click "Generate Q&A"</p>
                 </div>
               )}
               {loading && (
                 <div className="loading-output">
                   <Loader size={40} className="spin" />
-                  <p>Generating questions from your text...</p>
+                  <p>Generating questions from your paper...</p>
                 </div>
               )}
               {qaList.length > 0 && (

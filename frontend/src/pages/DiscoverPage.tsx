@@ -30,20 +30,19 @@ export default function DiscoverPage() {
     setHasSearched(true);
     try {
       const res = await api.post('/agent/search', {
-        query: form.name || form.field,
-        field: form.field,
-        description: form.description,
+        query,
+        max_results: 10,
       });
-      const data = res.data;
-      const results = data.papers || data.results || data;
+      const data = res.data?.data || res.data;
+      const results = data?.papers || data?.results || [];
       if (Array.isArray(results)) {
         setPapers(results.map((p: any, i: number) => ({
-          id: p.id || p.paperId || String(i),
+          id: p.paper_id || p.id || p.paperId || String(i),
           title: p.title || 'Untitled',
-          authors: p.authors || p.author || 'Unknown',
-          year: p.year || p.publicationDate || '',
+          authors: Array.isArray(p.authors) ? p.authors.join(', ') : (p.authors || 'Unknown'),
+          year: String(p.year || ''),
           abstract: p.abstract || p.summary || '',
-          url: p.url || p.externalIds?.DOI || '',
+          url: p.url || '',
         })));
       } else {
         setPapers([]);

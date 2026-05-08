@@ -33,9 +33,32 @@ export default function ChatPage() {
   const [reactions, setReactions] = useState<Record<number, string>>({});
   const messagesRef = useRef<HTMLDivElement>(null);
 
+  // Persistent user ID and session ID
+  const userIdRef = useRef<string>(
+    localStorage.getItem('pf_user_id') || crypto.randomUUID()
+  );
+  const sessionIdRef = useRef<string | null>(
+    localStorage.getItem('pf_session_id')
+  );
+
+  useEffect(() => {
+    localStorage.setItem('pf_user_id', userIdRef.current);
+  }, []);
+
   useEffect(() => {
     messagesRef.current?.scrollTo({ top: messagesRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, isTyping]);
+
+  const ensureSession = async (): Promise<string> => {
+    if (sessionIdRef.current) return sessionIdRef.current;
+    const res = await api.post('/chat/sessions', { title: 'New Chat' }, {
+      params: { user_id: userIdRef.current },
+    });
+    const sid = res.data?.data?.session_id || res.data?.session_id;
+    sessionIdRef.current = sid;
+    localStorage.setItem('pf_session_id', sid);
+    return sid;
+  };
 
   const handleSend = async (text: string = input) => {
     if (!text.trim()) return;
@@ -45,20 +68,29 @@ export default function ChatPage() {
     setIsTyping(true);
 
     try {
-      const res = await api.post('/chat/message', { message: text });
+      const sessionId = await ensureSession();
+      const res = await api.post('/chat/message', {
+        content: text,
+        session_id: sessionId,
+        input_type: 'text',
+      }, {
+        params: { user_id: userIdRef.current },
+      });
       setIsTyping(false);
+      const data = res.data?.data || res.data;
       const botMsg: Message = {
         id: Date.now() + 1,
-        text: res.data.response || res.data.answer || JSON.stringify(res.data),
+        text: data?.content || data?.response || data?.answer || JSON.stringify(data),
         sender: 'bot',
         timestamp: new Date().toISOString(),
       };
       setMessages(prev => [...prev, botMsg]);
-    } catch {
+    } catch (err: unknown) {
       setIsTyping(false);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       const botMsg: Message = {
         id: Date.now() + 1,
-        text: `I received your message: "${text}". The backend is currently unavailable — please ensure the gateway is running on port 8000.`,
+        text: `Error: ${errorMessage}`,
         sender: 'bot',
         timestamp: new Date().toISOString(),
       };

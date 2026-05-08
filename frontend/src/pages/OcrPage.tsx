@@ -6,6 +6,12 @@ import Navbar from '../components/Navbar';
 import PageTransition from '../components/PageTransition';
 import { ScanLine, Upload, ArrowLeft, Loader, Copy, FileText } from 'lucide-react';
 
+const getUserId = () => {
+  let uid = localStorage.getItem('pf_user_id');
+  if (!uid) { uid = crypto.randomUUID(); localStorage.setItem('pf_user_id', uid); }
+  return uid;
+};
+
 export default function OcrPage() {
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -14,6 +20,7 @@ export default function OcrPage() {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [fileName, setFileName] = useState('');
+  const [paperId, setPaperId] = useState<string | null>(null);
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -21,9 +28,14 @@ export default function OcrPage() {
     setFileName(f.name);
     setFile(f);
     setExtractedText('');
-    const reader = new FileReader();
-    reader.onload = (ev) => setPreview(ev.target?.result as string);
-    reader.readAsDataURL(f);
+    setPaperId(null);
+    if (f.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (ev) => setPreview(ev.target?.result as string);
+      reader.readAsDataURL(f);
+    } else {
+      setPreview(null);
+    }
   };
 
   const handleExtract = async () => {
@@ -32,18 +44,42 @@ export default function OcrPage() {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const res = await api.post('/ocr/upload', formData, {
+      const res = await api.post('/ocr/extract', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
+        params: { engine: 'paddle' },
       });
-      setExtractedText(res.data.text || res.data.extracted_text || JSON.stringify(res.data));
-    } catch {
-      setExtractedText('Backend is unavailable. Please ensure the gateway is running on port 8000.');
+      const data = res.data?.data || res.data;
+      setExtractedText(data?.text || data?.extracted_text || JSON.stringify(data));
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      setExtractedText(`Error: ${msg}`);
     } finally {
       setLoading(false);
     }
   };
 
-  const reset = () => { setPreview(null); setExtractedText(''); setFileName(''); setFile(null); };
+  const handleUploadAndProcess = async () => {
+    if (!file) return;
+    setLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await api.post('/ocr/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        params: { user_id: getUserId(), engine: 'paddle', language: 'en' },
+      });
+      const data = res.data?.data || res.data;
+      setPaperId(data?.paper_id || null);
+      setExtractedText(data?.extracted_text || data?.text || `Paper uploaded! ID: ${data?.paper_id}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      setExtractedText(`Error: ${msg}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const reset = () => { setPreview(null); setExtractedText(''); setFileName(''); setFile(null); setPaperId(null); };
 
   return (
     <>
@@ -64,34 +100,58 @@ export default function OcrPage() {
 
           {/* Upload Area */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-            onClick={() => !preview && fileRef.current?.click()}
+            onClick={() => !preview && !fileName && fileRef.current?.click()}
             style={{
               width: '100%', minHeight: 260, border: '2px dashed var(--current-border)',
               borderRadius: 16, display: 'flex', flexDirection: 'column', alignItems: 'center',
-              justifyContent: 'center', cursor: preview ? 'default' : 'pointer',
+              justifyContent: 'center', cursor: (preview || fileName) ? 'default' : 'pointer',
               transition: 'all 0.2s', background: 'rgba(255,255,255,0.02)', marginTop: 32,
               overflow: 'hidden',
             }}
           >
-            {!preview ? (
+            {!preview && !fileName ? (
               <div style={{ textAlign: 'center', padding: 40 }}>
                 <Upload size={48} style={{ color: 'var(--color-primary-cyan)', marginBottom: 16, opacity: 0.8 }} />
-                <h3 style={{ marginBottom: 8 }}>Drop an image here or click to upload</h3>
-                <p style={{ color: 'var(--current-text-secondary)', fontSize: 14 }}>Supports PNG, JPG, JPEG, PDF</p>
+                <h3 style={{ marginBottom: 8 }}>Drop a file here or click to upload</h3>
+                <p style={{ color: 'var(--current-text-secondary)', fontSize: 14 }}>Supports PNG, JPG, JPEG, PDF, DOCX</p>
               </div>
-            ) : (
+            ) : preview ? (
               <img src={preview} alt={fileName} style={{ maxWidth: '100%', maxHeight: 300, objectFit: 'contain', borderRadius: 8, padding: 16 }} />
+            ) : (
+              <div style={{ textAlign: 'center', padding: 40 }}>
+                <FileText size={48} style={{ color: 'var(--color-primary-cyan)', marginBottom: 16 }} />
+                <h3>{fileName}</h3>
+              </div>
             )}
           </motion.div>
-          <input type="file" ref={fileRef} style={{ display: 'none' }} accept=".png,.jpg,.jpeg,.pdf" onChange={handleFile} />
+          <input type="file" ref={fileRef} style={{ display: 'none' }} accept=".png,.jpg,.jpeg,.pdf,.docx" onChange={handleFile} />
 
           {/* Actions */}
-          {preview && (
+          {(preview || fileName) && (
             <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginTop: 24 }}>
               <button className="btn btn-primary" onClick={handleExtract} disabled={loading}>
                 {loading ? <><Loader size={18} className="spin" /> Extracting...</> : <><ScanLine size={18} /> Extract Text</>}
               </button>
+              <button className="btn btn-secondary" onClick={handleUploadAndProcess} disabled={loading}>
+                <Upload size={18} /> Upload & Save Paper
+              </button>
               <button className="btn btn-secondary" onClick={reset}>Reset</button>
+            </div>
+          )}
+
+          {/* Paper ID */}
+          {paperId && (
+            <div style={{
+              marginTop: 16, padding: '12px 20px', background: 'rgba(0,212,255,0.08)',
+              border: '1px solid rgba(0,212,255,0.2)', borderRadius: 8, fontSize: 14,
+              color: 'var(--color-primary-cyan)', display: 'flex', alignItems: 'center', gap: 8,
+            }}>
+              <FileText size={16} /> Paper saved! You can now use Summarize, Translate, or Q&A tools.
+              <button className="btn btn-secondary" style={{ marginLeft: 'auto', padding: '4px 10px', fontSize: 12 }}
+                onClick={() => navigator.clipboard.writeText(paperId)}
+              >
+                <Copy size={12} /> Copy Paper ID
+              </button>
             </div>
           )}
 
