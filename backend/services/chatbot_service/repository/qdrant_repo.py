@@ -29,9 +29,9 @@ class QdrantRepository:
         try:
             query_vector = embed_text(query)
 
-            results = await client.search(
+            response = await client.query_points(
                 collection_name=COLLECTION_NAME,
-                query_vector=query_vector,
+                query=query_vector,
                 query_filter=Filter(
                     must=[
                         FieldCondition(
@@ -44,13 +44,13 @@ class QdrantRepository:
             )
 
             chunks = []
-            for result in results:
+            for point in response.points:
                 chunks.append({
-                    "text": result.payload.get("text", ""),
-                    "paper_id": result.payload.get("paper_id", ""),
-                    "page_number": result.payload.get("page_number"),
-                    "section": result.payload.get("section", ""),
-                    "score": result.score,
+                    "text": point.payload.get("text", ""),
+                    "paper_id": point.payload.get("paper_id", ""),
+                    "page_number": point.payload.get("page_number"),
+                    "section": point.payload.get("section", ""),
+                    "score": point.score,
                 })
 
             logger.info(
