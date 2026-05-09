@@ -20,7 +20,8 @@ from shared.logger.logger import setup_logging, get_logger
 from shared.logger.middleware import RequestLoggingMiddleware
 from shared.error_handler.handler import register_exception_handlers
 from shared.rate_limiter.api_limiter import limiter
-from infrastructure.postgres.database import close_db, init_db
+from shared.auth.auto_user import ensure_user_exists
+from infrastructure.postgres.database import close_db, init_db, AsyncSessionFactory
 from infrastructure.qdrant.client import init_qdrant, close_qdrant
 from infrastructure.redis.client import init_redis, close_redis
 
@@ -54,6 +55,34 @@ app.add_middleware(
 
 # Request logging
 app.add_middleware(RequestLoggingMiddleware)
+
+
+# ── Auto-User Provisioning Middleware ─────────────────────────
+from starlette.middleware.base import BaseHTTPMiddleware  # noqa: E402
+import uuid as _uuid  # noqa: E402
+
+
+class AutoUserMiddleware(BaseHTTPMiddleware):
+    """Auto-create anonymous users for demo mode.
+
+    Intercepts requests that have a user_id query parameter and
+    ensures the corresponding user row exists in the database before
+    the route handler runs. This prevents FK violations.
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        user_id_str = request.query_params.get("user_id")
+        if user_id_str:
+            try:
+                uid = _uuid.UUID(user_id_str)
+                async with AsyncSessionFactory() as session:
+                    await ensure_user_exists(session, uid)
+            except (ValueError, Exception):
+                pass  # Invalid UUID or DB error — let the route handle it
+        return await call_next(request)
+
+
+app.add_middleware(AutoUserMiddleware)
 
 # ── Exception Handlers ────────────────────────────────────────
 register_exception_handlers(app)
