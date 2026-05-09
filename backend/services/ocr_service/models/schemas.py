@@ -12,7 +12,7 @@ from datetime import datetime
 
 class OCRRequest(BaseModel):
     """Request schema for OCR extraction."""
-    engine: Literal["paddle", "mistral", "lighton"] = "paddle"
+    engine: Literal["paddle", "mistral", "lighton", "llm"] = "paddle"
     language: Literal["en", "ar"] = "en"
 
 

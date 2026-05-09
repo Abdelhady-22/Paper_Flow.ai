@@ -53,6 +53,7 @@ class Settings(BaseSettings):
     # ── LLM Settings ──────────────────────────────────────────
     LLM_TIMEOUT: int = 30
     LLM_MAX_RETRIES: int = 3
+    LLM_OCR_MODEL: Optional[str] = None  # Override LLM model for OCR (default: gemini/gemini-1.5-flash)
     LLM_MAX_CONCURRENT: int = 5
     LLM_TEMPERATURE: float = 0.3
     LLM_MAX_TOKENS: int = 1000

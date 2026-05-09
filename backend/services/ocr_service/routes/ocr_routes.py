@@ -22,12 +22,13 @@ file_validator = FileValidator()
 async def extract_text(
     request: Request,
     file: UploadFile = File(...),
-    engine: str = Query("paddle", description="OCR engine: paddle, mistral, lighton"),
+    engine: str = Query("paddle", description="OCR engine: paddle, mistral, lighton, llm"),
     service: OCRService = Depends(),
 ):
     """
     Extract text from an uploaded file using OCR.
     Supports: PDF, DOCX, PNG, JPG, JPEG, TIFF, BMP.
+    Engine 'llm' uses vision-capable LLMs (Gemini, GPT-4o) for extraction.
     """
     file_bytes = await file_validator.validate(file, context="document")
     result = await service.extract_text_from_file(
@@ -48,7 +49,7 @@ async def upload_paper(
     request: Request,
     file: UploadFile = File(...),
     user_id: UUID = Query(..., description="User ID"),
-    engine: str = Query("paddle", description="OCR engine for fallback"),
+    engine: str = Query("paddle", description="OCR engine for fallback: paddle, mistral, lighton, llm"),
     language: str = Query("en", description="Paper language: en, ar"),
     service: OCRService = Depends(),
 ):

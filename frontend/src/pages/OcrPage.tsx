@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import api from '../api/client';
 import Navbar from '../components/Navbar';
 import PageTransition from '../components/PageTransition';
-import { ScanLine, Upload, ArrowLeft, Loader, Copy, FileText } from 'lucide-react';
+import { ScanLine, Upload, ArrowLeft, Loader, Copy, FileText, Sparkles } from 'lucide-react';
 
 const getUserId = () => {
   let uid = localStorage.getItem('pf_user_id');
@@ -21,6 +21,7 @@ export default function OcrPage() {
   const [loading, setLoading] = useState(false);
   const [fileName, setFileName] = useState('');
   const [paperId, setPaperId] = useState<string | null>(null);
+  const [engine, setEngine] = useState('paddle');
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -46,7 +47,7 @@ export default function OcrPage() {
       formData.append('file', file);
       const res = await api.post('/ocr/extract', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
-        params: { engine: 'paddle' },
+        params: { engine },
       });
       const data = res.data?.data || res.data;
       setExtractedText(data?.text || data?.extracted_text || JSON.stringify(data));
@@ -66,7 +67,7 @@ export default function OcrPage() {
       formData.append('file', file);
       const res = await api.post('/ocr/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
-        params: { user_id: getUserId(), engine: 'paddle', language: 'en' },
+        params: { user_id: getUserId(), engine, language: 'en' },
       });
       const data = res.data?.data || res.data;
       setPaperId(data?.paper_id || null);
@@ -79,7 +80,7 @@ export default function OcrPage() {
     }
   };
 
-  const reset = () => { setPreview(null); setExtractedText(''); setFileName(''); setFile(null); setPaperId(null); };
+  const reset = () => { setPreview(null); setExtractedText(''); setFileName(''); setFile(null); setPaperId(null); setEngine('paddle'); };
 
   return (
     <>
@@ -126,9 +127,38 @@ export default function OcrPage() {
           </motion.div>
           <input type="file" ref={fileRef} style={{ display: 'none' }} accept=".png,.jpg,.jpeg,.pdf,.docx" onChange={handleFile} />
 
+          {/* Engine Selector */}
+          {(preview || fileName) && (
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center', alignItems: 'center', marginTop: 24 }}>
+              <label style={{ fontSize: 14, color: 'var(--current-text-secondary)', fontWeight: 500 }}>Engine:</label>
+              <div style={{ display: 'flex', gap: 4, background: 'var(--current-input-bg)', border: '1px solid var(--current-border)', borderRadius: 10, padding: 3 }}>
+                {[
+                  { id: 'paddle', label: 'PaddleOCR', icon: <ScanLine size={14} />, desc: 'Local · Free' },
+                  { id: 'llm', label: 'AI Vision', icon: <Sparkles size={14} />, desc: 'Cloud · Smart' },
+                ].map((eng) => (
+                  <button
+                    key={eng.id}
+                    onClick={() => setEngine(eng.id)}
+                    style={{
+                      padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                      fontSize: 13, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6,
+                      transition: 'all 0.2s',
+                      background: engine === eng.id ? 'var(--color-primary-cyan)' : 'transparent',
+                      color: engine === eng.id ? '#000' : 'var(--current-text-secondary)',
+                      boxShadow: engine === eng.id ? '0 2px 8px rgba(0,212,255,0.3)' : 'none',
+                    }}
+                  >
+                    {eng.icon} {eng.label}
+                    <span style={{ fontSize: 10, opacity: 0.7 }}>{eng.desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Actions */}
           {(preview || fileName) && (
-            <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginTop: 24 }}>
+            <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginTop: 16 }}>
               <button className="btn btn-primary" onClick={handleExtract} disabled={loading}>
                 {loading ? <><Loader size={18} className="spin" /> Extracting...</> : <><ScanLine size={18} /> Extract Text</>}
               </button>

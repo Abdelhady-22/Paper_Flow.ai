@@ -22,7 +22,11 @@ class OCREngineSelector:
         elif engine == "lighton":
             from services.ocr_service.utils.lighton_wrapper import LightOnOCREngine
             return LightOnOCREngine()
+        elif engine == "llm":
+            from services.ocr_service.utils.llm_ocr_wrapper import LLMOCREngine
+            return LLMOCREngine()
         else:
             raise OCREngineNotFoundException(
-                f"Unknown OCR engine: '{engine}'. Available: paddle, mistral, lighton"
+                f"Unknown OCR engine: '{engine}'. Available: paddle, mistral, lighton, llm"
             )
+
