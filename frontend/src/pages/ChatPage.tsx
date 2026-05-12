@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { staggerContainer, fadeInUp } from '../utils/motion';
+import { generateUUID } from '../utils/uuid';
 import api from '../api/client';
 import {
   FileText, Paperclip, Mic, Send, Copy, ThumbsUp, ThumbsDown,
@@ -35,7 +36,7 @@ export default function ChatPage() {
 
   // Persistent user ID and session ID
   const userIdRef = useRef<string>(
-    localStorage.getItem('pf_user_id') || crypto.randomUUID()
+    localStorage.getItem('pf_user_id') || generateUUID()
   );
   const sessionIdRef = useRef<string | null>(
     localStorage.getItem('pf_session_id')

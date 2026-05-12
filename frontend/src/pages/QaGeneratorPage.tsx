@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import api from '../api/client';
+import { generateUUID } from '../utils/uuid';
 import Navbar from '../components/Navbar';
 import PageTransition from '../components/PageTransition';
 import { HelpCircle, ArrowLeft, Loader, Download, ChevronDown, ChevronUp, Upload, FileText, AlertCircle } from 'lucide-react';
@@ -13,7 +14,7 @@ interface QA {
 
 const getUserId = () => {
   let uid = localStorage.getItem('pf_user_id');
-  if (!uid) { uid = crypto.randomUUID(); localStorage.setItem('pf_user_id', uid); }
+  if (!uid) { uid = generateUUID(); localStorage.setItem('pf_user_id', uid); }
   return uid;
 };
 
