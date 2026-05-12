@@ -86,3 +86,6 @@ websockets>=12.0
 # ── Utilities ─────────────────────────────────────────────────
 python-multipart>=0.0.6
 aiofiles>=23.2.1
+
+# ── Google Cloud Storage (for GCP deployment) ─────────────────
+google-cloud-storage>=2.14.0

@@ -1,0 +1,79 @@
+# Deploy to GCP — Auto-deploy on push to main
+# SSHs into the GCP VM, pulls latest code, and rebuilds containers
+
+name: Deploy to GCP
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:   # Allow manual trigger from GitHub UI
+
+env:
+  VM_PROJECT_DIR: ~/Paper_Flow.ai
+
+jobs:
+  deploy:
+    name: Deploy to GCP VM
+    runs-on: ubuntu-latest
+
+    # Only deploy if CI passes (if ci-cd.yml is also triggered)
+    # To enforce: uncomment the 'needs' line and add ci-cd.yml workflow_call trigger
+    # needs: ci
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.GCP_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.GCP_VM_IP }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Deploy to VM
+        run: |
+          ssh -o StrictHostKeyChecking=no \
+              -i ~/.ssh/deploy_key \
+              ${{ secrets.GCP_SSH_USER }}@${{ secrets.GCP_VM_IP }} << 'DEPLOY_SCRIPT'
+
+          set -e
+          echo "── Deploying Paper Flow AI ──"
+
+          cd ~/Paper_Flow.ai
+
+          # Pull latest code
+          echo "→ Pulling latest code..."
+          git fetch origin main
+          git reset --hard origin/main
+
+          # Rebuild and restart containers
+          echo "→ Rebuilding containers..."
+          docker compose up --build -d
+
+          # Wait for containers to be healthy
+          echo "→ Waiting for containers to start..."
+          sleep 15
+
+          # Show container status
+          echo "→ Container status:"
+          docker compose ps
+
+          # Quick health check
+          echo "→ Health check:"
+          curl -sf http://localhost:8000/health && echo " API ✅" || echo " API ❌"
+          curl -sf http://localhost:3000 > /dev/null && echo " Frontend ✅" || echo " Frontend ❌"
+
+          echo "── Deploy complete ──"
+          DEPLOY_SCRIPT
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+      - name: Report deployment status
+        if: success()
+        run: |
+          echo "✅ Deployed successfully to ${{ secrets.GCP_VM_IP }}"
+          echo "Frontend: http://${{ secrets.GCP_VM_IP }}:3000"
+          echo "API Docs: http://${{ secrets.GCP_VM_IP }}:8000/docs"

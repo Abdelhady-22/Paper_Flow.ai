@@ -88,6 +88,8 @@ class Settings(BaseSettings):
     # ── Storage ───────────────────────────────────────────────
     UPLOAD_DIR: str = "./storage/uploads"
     AGENT_DOWNLOAD_DIR: str = "./storage/agent_downloads"
+    STORAGE_BACKEND: str = "local"            # "local" or "gcs"
+    GCS_BUCKET_NAME: Optional[str] = None     # e.g. "paperflow-pdfs-demo"
 
     # ── App ───────────────────────────────────────────────────
     DEBUG: bool = False
