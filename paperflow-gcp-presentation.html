@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Flow AI — GCP Deployment</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gcp-blue: #1a73e8;
+    --gcp-teal: #00897b;
+    --gcp-green: #34a853;
+    --gcp-yellow: #fbbc04;
+    --gcp-red: #ea4335;
+    --dark: #0a0f1e;
+    --dark2: #111827;
+    --dark3: #1f2937;
+    --card: #1a2236;
+    --border: #2d3a52;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --accent: #00d4ff;
+    --accent2: #7c3aed;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--dark);
+    color: var(--text);
+    overflow: hidden;
+    height: 100vh;
+  }
+
+  /* ──── SLIDE CONTAINER ──── */
+  .deck { width: 100vw; height: 100vh; position: relative; }
+
+  .slide {
+    position: absolute; inset: 0;
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .slide.active { display: flex; }
+
+  /* ──── NAV ──── */
+  .nav {
+    position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 12px; align-items: center;
+    background: rgba(26,34,54,0.92); backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
+    padding: 10px 22px; border-radius: 40px;
+    z-index: 999;
+  }
+  .nav button {
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    font-size: 18px; padding: 4px 8px; border-radius: 8px;
+    transition: all .2s;
+  }
+  .nav button:hover { color: var(--accent); background: rgba(0,212,255,.1); }
+  .nav .counter { font-family: 'Space Mono', monospace; font-size: 12px; color: var(--muted); min-width: 60px; text-align: center; }
+  .nav .dots { display: flex; gap: 6px; }
+  .nav .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border); transition: all .3s; cursor: pointer; }
+  .nav .dot.active { background: var(--accent); width: 18px; border-radius: 4px; }
+
+  /* ──── COMMON SLIDE PARTS ──── */
+  .slide-header {
+    padding: 32px 52px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 16px;
+  }
+  .slide-tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--accent); background: rgba(0,212,255,.08);
+    border: 1px solid rgba(0,212,255,.25); border-radius: 4px;
+    padding: 3px 10px;
+  }
+  .slide-title {
+    font-size: 26px; font-weight: 700;
+    background: linear-gradient(135deg, #fff 40%, var(--accent));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .slide-body { flex: 1; padding: 28px 52px; overflow-y: auto; }
+
+  /* ──── TITLE SLIDE ──── */
+  #slide-1 {
+    background: radial-gradient(ellipse at 20% 50%, rgba(26,115,232,.18) 0%, transparent 60%),
+                radial-gradient(ellipse at 80% 20%, rgba(0,212,255,.12) 0%, transparent 50%),
+                var(--dark);
+    justify-content: center; align-items: center; text-align: center;
+  }
+  #slide-1 .title-logo {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px; letter-spacing: 4px; color: var(--accent);
+    margin-bottom: 24px; text-transform: uppercase;
+  }
+  #slide-1 h1 {
+    font-size: clamp(36px, 5vw, 64px); font-weight: 700; line-height: 1.1;
+    background: linear-gradient(135deg, #fff 30%, #00d4ff 60%, #7c3aed);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    margin-bottom: 16px;
+  }
+  #slide-1 .subtitle {
+    font-size: 18px; color: var(--muted); max-width: 560px;
+    line-height: 1.6; margin-bottom: 48px;
+  }
+  #slide-1 .badge-row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .badge {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 18px; border-radius: 100px;
+    border: 1px solid var(--border);
+    font-size: 13px; font-weight: 500;
+    background: rgba(255,255,255,.04);
+  }
+  .badge .dot2 { width: 8px; height: 8px; border-radius: 50%; }
+
+  /* ──── OVERVIEW GRID ──── */
+  .feature-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .feature-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 18px 16px;
+    transition: border-color .2s, transform .2s;
+  }
+  .feature-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .feature-card .icon { font-size: 24px; margin-bottom: 10px; }
+  .feature-card h4 { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .feature-card p { font-size: 11px; color: var(--muted); line-height: 1.5; }
+  .feature-card .cost { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--gcp-green); margin-top: 8px; }
+
+  /* ──── COMPARISON TABLE ──── */
+  .compare-table { width: 100%; border-collapse: separate; border-spacing: 0 6px; }
+  .compare-table th {
+    font-family: 'Space Mono', monospace; font-size: 10px; letter-spacing: 2px;
+    color: var(--muted); text-transform: uppercase; padding: 8px 16px; text-align: left;
+  }
+  .compare-table td { padding: 12px 16px; }
+  .compare-table tr td:first-child { border-radius: 8px 0 0 8px; }
+  .compare-table tr td:last-child { border-radius: 0 8px 8px 0; }
+  .compare-table tbody tr { background: var(--card); transition: background .2s; }
+  .compare-table tbody tr:hover { background: var(--dark3); }
+  .compare-table .used { color: var(--gcp-green); font-weight: 700; }
+  .compare-table .aws-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(255,153,0,.12); border: 1px solid rgba(255,153,0,.3);
+    color: #ffa500; border-radius: 6px; padding: 2px 10px; font-size: 12px;
+  }
+  .compare-table .gcp-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(26,115,232,.12); border: 1px solid rgba(26,115,232,.3);
+    color: #60a5fa; border-radius: 6px; padding: 2px 10px; font-size: 12px;
+    font-weight: 600;
+  }
+  .yes-badge { color: var(--gcp-green); font-weight: 700; }
+  .no-badge { color: var(--muted); }
+
+  /* ──── ARCHITECTURE ──── */
+  .arch-wrapper {
+    display: flex; justify-content: center; align-items: flex-start;
+    gap: 24px; flex-wrap: wrap;
+  }
+  .arch-vm {
+    background: linear-gradient(135deg, var(--card), #162032);
+    border: 2px solid var(--gcp-blue);
+    border-radius: 16px; padding: 22px 28px; min-width: 440px;
+    box-shadow: 0 0 32px rgba(26,115,232,.2);
+  }
+  .arch-vm-title {
+    font-family: 'Space Mono', monospace; font-size: 11px;
+    color: var(--gcp-blue); letter-spacing: 2px; margin-bottom: 16px;
+    text-transform: uppercase;
+  }
+  .container-row { display: flex; gap: 10px; margin-bottom: 10px; }
+  .container-box {
+    flex: 1; background: rgba(255,255,255,.04); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 12px;
+  }
+  .container-box .cname { font-size: 11px; font-weight: 700; color: var(--accent); }
+  .container-box .ctype { font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .container-box .cport {
+    font-family: 'Space Mono', monospace; font-size: 10px;
+    color: var(--gcp-yellow); margin-top: 4px;
+  }
+  .arch-services { display: flex; gap: 14px; flex-direction: column; min-width: 180px; }
+  .svc-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 16px;
+    border-left: 3px solid var(--gcp-blue);
+  }
+  .svc-card .sname { font-size: 12px; font-weight: 700; color: #fff; }
+  .svc-card .seq { font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .arrow-row { display: flex; justify-content: center; align-items: center; gap: 8px; padding: 8px 0; }
+  .arrow-row span { font-size: 18px; color: var(--gcp-blue); }
+
+  /* ──── SERVICES ──── */
+  .services-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .svc-detail {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 14px; padding: 22px;
+    border-top: 3px solid var(--gcp-blue);
+    transition: border-color .2s;
+  }
+  .svc-detail:nth-child(2) { border-top-color: var(--gcp-teal); }
+  .svc-detail:nth-child(3) { border-top-color: var(--accent2); }
+  .svc-detail:nth-child(4) { border-top-color: var(--gcp-green); }
+  .svc-detail:hover { border-color: var(--accent); }
+  .svc-num { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+  .svc-name { font-size: 17px; font-weight: 700; margin-bottom: 4px; }
+  .svc-aws { font-size: 11px; color: #ffa500; margin-bottom: 12px; }
+  .svc-specs { display: flex; flex-direction: column; gap: 5px; }
+  .svc-spec { display: flex; gap: 10px; font-size: 12px; }
+  .svc-spec .lbl { color: var(--muted); min-width: 90px; }
+  .svc-spec .val { color: var(--text); font-family: 'Space Mono', monospace; font-size: 11px; }
+  .svc-cost-badge {
+    display: inline-block; margin-top: 12px;
+    background: rgba(52,168,83,.12); border: 1px solid rgba(52,168,83,.3);
+    color: var(--gcp-green); border-radius: 6px; padding: 3px 12px;
+    font-family: 'Space Mono', monospace; font-size: 11px;
+  }
+
+  /* ──── STEP SLIDE ──── */
+  .step-layout { display: grid; grid-template-columns: 220px 1fr; gap: 24px; height: 100%; }
+  .step-sidebar { display: flex; flex-direction: column; gap: 6px; }
+  .step-btn {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 16px; cursor: pointer;
+    text-align: left; transition: all .2s; color: var(--muted);
+    font-family: 'DM Sans', sans-serif;
+  }
+  .step-btn:hover { border-color: var(--accent); color: var(--text); }
+  .step-btn.active { border-color: var(--gcp-blue); color: #fff; background: rgba(26,115,232,.12); }
+  .step-btn .snum { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--gcp-blue); margin-bottom: 3px; }
+  .step-btn .stitle { font-size: 12px; font-weight: 600; }
+  .step-content { overflow-y: auto; }
+  .step-commands { display: flex; flex-direction: column; gap: 12px; }
+  .cmd-block { background: var(--dark2); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .cmd-label {
+    font-size: 11px; color: var(--muted); padding: 8px 14px;
+    border-bottom: 1px solid var(--border); background: rgba(255,255,255,.02);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .cmd-label .copy-btn {
+    background: none; border: 1px solid var(--border); border-radius: 4px;
+    color: var(--muted); cursor: pointer; padding: 2px 8px; font-size: 10px;
+    transition: all .2s; font-family: 'DM Sans', sans-serif;
+    display: none;
+  }
+  .cmd-label .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .cmd-block:hover .copy-btn { display: block; }
+  .cmd-reveal-btn {
+    width: 100%; background: none; border: none;
+    padding: 14px 16px; text-align: left; cursor: pointer;
+    color: var(--muted); font-size: 13px; transition: color .2s;
+    display: flex; align-items: center; gap: 10px;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .cmd-reveal-btn:hover { color: var(--text); }
+  .cmd-reveal-btn .icon2 { font-size: 16px; }
+  .cmd-code {
+    display: none;
+    padding: 14px 16px;
+    background: #080d1a;
+    border-top: 1px solid var(--border);
+    font-family: 'Space Mono', monospace;
+    font-size: 12px; color: #a5f3fc;
+    white-space: pre-wrap; word-break: break-all;
+    line-height: 1.7;
+  }
+  .cmd-code.visible { display: block; animation: fadeIn .25s ease; }
+  .cmd-note { padding: 8px 16px 12px; font-size: 11px; color: var(--muted); font-style: italic; }
+  .copy-success { color: var(--gcp-green) !important; }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ──── COST ──── */
+  .cost-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .cost-table { width: 100%; border-collapse: collapse; }
+  .cost-table th { text-align: left; font-size: 11px; color: var(--muted); padding: 8px 12px; font-family: 'Space Mono', monospace; letter-spacing: 1px; border-bottom: 1px solid var(--border); }
+  .cost-table td { padding: 10px 12px; font-size: 13px; border-bottom: 1px solid rgba(255,255,255,.03); }
+  .cost-table tr:last-child td { font-weight: 700; color: var(--gcp-green); border-top: 1px solid var(--border); border-bottom: none; }
+  .cost-table .price { font-family: 'Space Mono', monospace; color: var(--gcp-green); font-size: 12px; }
+  .cost-table .free-badge { font-size: 10px; color: var(--gcp-green); background: rgba(52,168,83,.12); border-radius: 4px; padding: 2px 8px; }
+  .tip-box { background: rgba(26,115,232,.08); border: 1px solid rgba(26,115,232,.25); border-radius: 10px; padding: 14px 18px; margin-top: 14px; }
+  .tip-box .tip-title { font-size: 12px; font-weight: 700; color: var(--gcp-blue); margin-bottom: 6px; }
+  .tip-box p { font-size: 12px; color: var(--muted); line-height: 1.6; }
+
+  /* ──── CLEANUP ──── */
+  .cleanup-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  .cleanup-card {
+    background: var(--card); border: 1px solid rgba(234,67,53,.25);
+    border-radius: 12px; overflow: hidden;
+  }
+  .cleanup-card .cc-head { background: rgba(234,67,53,.1); padding: 10px 16px; font-size: 12px; font-weight: 700; color: #f87171; }
+  .cleanup-card .cc-body { padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+  .mini-cmd {
+    background: #080d1a; border: 1px solid var(--border);
+    border-radius: 6px; padding: 6px 10px;
+    font-family: 'Space Mono', monospace; font-size: 10px;
+    color: #a5f3fc; cursor: pointer; transition: border-color .2s;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .mini-cmd:hover { border-color: var(--accent); }
+  .mini-cmd .mini-copy { color: var(--muted); font-size: 10px; opacity: 0; transition: opacity .2s; }
+  .mini-cmd:hover .mini-copy { opacity: 1; }
+
+  /* ──── TROUBLESHOOT ──── */
+  .trouble-table { width: 100%; border-collapse: separate; border-spacing: 0 6px; font-size: 12px; }
+  .trouble-table th { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; padding: 6px 14px; text-align: left; }
+  .trouble-table td { padding: 10px 14px; background: var(--card); }
+  .trouble-table tr td:first-child { border-radius: 8px 0 0 8px; color: #f87171; font-weight: 600; }
+  .trouble-table tr td:last-child { border-radius: 0 8px 8px 0; color: var(--gcp-green); }
+  .trouble-table tr td:nth-child(2) { font-family: 'Space Mono', monospace; font-size: 10px; color: #a5f3fc; }
+
+  /* ──── QUICK REF ──── */
+  .qref-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .qref-section h4 { font-size: 13px; font-weight: 700; margin-bottom: 10px; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+  .qref-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 10px; border-radius: 6px; font-size: 12px;
+    transition: background .15s; cursor: pointer;
+  }
+  .qref-row:hover { background: rgba(255,255,255,.04); }
+  .qref-row .action { color: var(--text); }
+  .qref-row .qcmd { font-family: 'Space Mono', monospace; font-size: 10px; color: #a5f3fc; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* progress bar on title */
+  .progress-bar { position: fixed; top: 0; left: 0; height: 3px; background: linear-gradient(90deg, var(--gcp-blue), var(--accent)); transition: width .4s ease; z-index: 1000; }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  .step-desc { font-size: 13px; color: var(--muted); margin-bottom: 16px; line-height: 1.6; background: rgba(26,115,232,.06); border-left: 3px solid var(--gcp-blue); padding: 10px 14px; border-radius: 0 8px 8px 0; }
+</style>
+</head>
+<body>
+
+<div class="progress-bar" id="progressBar"></div>
+
+<div class="deck">
+
+  <!-- ═══════════════════════════════ SLIDE 1 — TITLE ═══════════════════════════════ -->
+  <div class="slide active" id="slide-1">
+    <div class="title-logo">☁ GCP Deployment Guide</div>
+    <h1>Paper Flow AI</h1>
+    <p class="subtitle">Full-stack AI-powered academic paper assistant deployed on Google Cloud Platform using 4 core services</p>
+    <div class="badge-row">
+      <div class="badge"><div class="dot2" style="background:#1a73e8"></div> Compute Engine</div>
+      <div class="badge"><div class="dot2" style="background:#00897b"></div> Cloud Storage</div>
+      <div class="badge"><div class="dot2" style="background:#7c3aed"></div> Secret Manager</div>
+      <div class="badge"><div class="dot2" style="background:#34a853"></div> Cloud Monitoring</div>
+      <div class="badge"><div class="dot2" style="background:#00d4ff"></div> Docker Compose</div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════ SLIDE 2 — OVERVIEW ═══════════════════════════════ -->
+  <div class="slide" id="slide-2">
+    <div class="slide-header">
+      <span class="slide-tag">App Overview</span>
+      <span class="slide-title">8 AI-Powered Features · 5 Docker Containers</span>
+    </div>
+    <div class="slide-body">
+      <div class="feature-grid">
+        <div class="feature-card"><div class="icon">📄</div><h4>Upload PDF</h4><p>FastAPI + PostgreSQL for document ingestion</p><div class="cost">Free</div></div>
+        <div class="feature-card"><div class="icon">🔍</div><h4>OCR</h4><p>PaddleOCR runs locally on CPU — no API needed</p><div class="cost">Free</div></div>
+        <div class="feature-card"><div class="icon">💬</div><h4>Chat</h4><p>GPT-4o-mini via RAG + Qdrant vector search</p><div class="cost">~$0.001–0.003/req</div></div>
+        <div class="feature-card"><div class="icon">📝</div><h4>Summarize</h4><p>OpenAI GPT-4o-mini intelligent summaries</p><div class="cost">~$0.002–0.005/req</div></div>
+        <div class="feature-card"><div class="icon">🌐</div><h4>Translate EN↔AR</h4><p>Full Arabic–English bidirectional translation</p><div class="cost">~$0.002–0.005/req</div></div>
+        <div class="feature-card"><div class="icon">❓</div><h4>Q&A Generation</h4><p>Auto-generate study questions from papers</p><div class="cost">~$0.002–0.005/req</div></div>
+        <div class="feature-card"><div class="icon">🔊</div><h4>Text-to-Speech</h4><p>Edge TTS — free cloud voice synthesis</p><div class="cost">Free</div></div>
+        <div class="feature-card"><div class="icon">🔭</div><h4>Discover Papers</h4><p>OpenAI Agent + Semantic Scholar API search</p><div class="cost">~$0.001/req</div></div>
+      </div>
+      <div style="margin-top:20px; display:flex; gap:14px;">
+        <div style="flex:1; background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px;">
+          <div style="font-size:11px; color:var(--muted); font-family:'Space Mono',monospace; margin-bottom:10px; letter-spacing:1px;">CONTAINERS (5 via Docker Compose)</div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <div class="container-box"><div class="cname">Frontend</div><div class="ctype">Nginx + React</div><div class="cport">:3000</div></div>
+            <div class="container-box"><div class="cname">Gateway</div><div class="ctype">FastAPI backend</div><div class="cport">:8000</div></div>
+            <div class="container-box"><div class="cname">PostgreSQL</div><div class="ctype">user data</div><div class="cport">:5432</div></div>
+            <div class="container-box"><div class="cname">Qdrant</div><div class="ctype">vector embeddings</div><div class="cport">:6333</div></div>
+            <div class="container-box"><div class="cname">Redis</div><div class="ctype">cache + progress</div><div class="cport">:6379</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════ SLIDE 3 — GCP vs AWS ═══════════════════════════════ -->
+  <div class="slide" id="slide-3">
+    <div class="slide-header">
+      <span class="slide-tag">GCP vs AWS</span>
+      <span class="slide-title">First 4 Services Used in This Deployment</span>
+    </div>
+    <div class="slide-body">
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th>AWS Service</th><th>GCP Equivalent</th><th>Used?</th><th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="aws-pill">🟠 EC2</span></td>
+            <td><span class="gcp-pill">🔵 Compute Engine (GCE)</span></td>
+            <td><span class="yes-badge">✅ Yes</span></td>
+            <td style="font-size:12px; color:var(--muted)">Virtual machine — runs all containers</td>
+          </tr>
+          <tr>
+            <td><span class="aws-pill">🟠 S3</span></td>
+            <td><span class="gcp-pill">🔵 Cloud Storage (GCS)</span></td>
+            <td><span class="yes-badge">✅ Yes</span></td>
+            <td style="font-size:12px; color:var(--muted)">Object storage — stores uploaded PDFs</td>
+          </tr>
+          <tr>
+            <td><span class="aws-pill">🟠 Secrets Manager</span></td>
+            <td><span class="gcp-pill">🔵 Secret Manager</span></td>
+            <td><span class="yes-badge">✅ Yes</span></td>
+            <td style="font-size:12px; color:var(--muted)">Stores API keys and passwords securely</td>
+          </tr>
+          <tr>
+            <td><span class="aws-pill">🟠 CloudWatch</span></td>
+            <td><span class="gcp-pill">🔵 Cloud Monitoring</span></td>
+            <td><span class="yes-badge">✅ Yes</span></td>
+            <td style="font-size:12px; color:var(--muted)">Metrics, alerts, logs, uptime checks</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div style="margin-top:22px; display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+        <div style="background:var(--card); border:1px solid var(--border); border-radius:12px; padding:18px;">
+          <div style="font-size:11px; font-family:'Space Mono',monospace; color:var(--muted); margin-bottom:12px; letter-spacing:1px;">KEY DIFFERENCES</div>
+          <div style="display:flex; flex-direction:column; gap:8px; font-size:12px;">
+            <div style="display:flex; gap:16px;"><span style="color:var(--muted); min-width:100px">CLI tool</span><span style="color:#ffa500; font-family:'Space Mono',monospace; font-size:11px">aws</span><span style="color:var(--muted); padding:0 8px">→</span><span style="color:#60a5fa; font-family:'Space Mono',monospace; font-size:11px">gcloud</span></div>
+            <div style="display:flex; gap:16px;"><span style="color:var(--muted); min-width:100px">SSH into VM</span><span style="color:var(--text); font-size:11px">key pair</span><span style="color:var(--muted); padding:0 8px">→</span><span style="color:#60a5fa; font-size:11px">auto key mgmt</span></div>
+            <div style="display:flex; gap:16px;"><span style="color:var(--muted); min-width:100px">Permissions</span><span style="color:var(--text); font-size:11px">IAM Role on EC2</span><span style="color:var(--muted); padding:0 8px">→</span><span style="color:#60a5fa; font-size:11px">Service Account</span></div>
+          </div>
+        </div>
+        <div style="background:rgba(52,168,83,.08); border:1px solid rgba(52,168,83,.25); border-radius:12px; padding:18px;">
+          <div style="font-size:11px; font-family:'Space Mono',monospace; color:var(--gcp-green); margin-bottom:12px; letter-spacing:1px;">FREE TRIAL ADVANTAGE</div>
+          <div style="font-size:13px; line-height:1.7; color:var(--text)">
+            <div>🟠 AWS — 12 months free tier <span style="color:var(--muted)">(limited)</span></div>
+            <div>🔵 GCP — <strong style="color:var(--gcp-green)">$300 credits for 90 days</strong></div>
+          </div>
+          <div style="margin-top:12px; font-size:11px; color:var(--muted)">This entire deployment costs ~$4.82 from the $300 budget, leaving $295.18 remaining.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════ SLIDE 4 — ARCHITECTURE ═══════════════════════════════ -->
+  <div class="slide" id="slide-4">
+    <div class="slide-header">
+      <span class="slide-tag">Full Architecture</span>
+      <span class="slide-title">GCP Services Only — Visual Diagram</span>
+    </div>
+    <div class="slide-body">
+      <div style="display:flex; flex-direction:column; align-items:center; gap:16px; padding-bottom:20px;">
+
+        <!-- VM Box -->
+        <div class="arch-vm" style="width:100%; max-width:680px;">
+          <div class="arch-vm-title">🖥 Compute Engine VM · e2-standard-2 · us-central1-a · = AWS EC2</div>
+          <div class="container-row">
+            <div class="container-box" style="border-color:#1a73e8;">
+              <div class="cname">Frontend</div>
+              <div class="ctype">Nginx + React</div>
+              <div class="cport">:3000</div>
+            </div>
+            <div style="display:flex;align-items:center;font-size:20px;color:var(--gcp-blue)">→</div>
+            <div class="container-box" style="border-color:#00897b; flex:2">
+              <div class="cname">Gateway</div>
+              <div class="ctype">FastAPI + OCR + Whisper</div>
+              <div class="cport">:8000</div>
+            </div>
+          </div>
+          <div class="container-row">
+            <div class="container-box">
+              <div class="cname" style="color:#f87171">PostgreSQL</div>
+              <div class="ctype">user data</div>
+              <div class="cport">:5432</div>
+            </div>
+            <div class="container-box">
+              <div class="cname" style="color:#a78bfa">Qdrant</div>
+              <div class="ctype">vector embeddings</div>
+              <div class="cport">:6333</div>
+            </div>
+            <div class="container-box">
+              <div class="cname" style="color:#fbbf24">Redis</div>
+              <div class="ctype">cache + progress</div>
+              <div class="cport">:6379</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Arrows -->
+        <div style="display:flex; gap:60px; align-items:center; color:var(--gcp-blue); font-size:22px;">
+          <span>↓</span><span>↓</span><span>↓</span>
+        </div>
+
+        <!-- External GCP Services -->
+        <div style="display:flex; gap:14px; width:100%; max-width:680px;">
+          <div class="svc-card" style="flex:1; border-left-color:#00897b;">
+            <div class="sname">☁ Cloud Storage</div>
+            <div class="seq">= AWS S3 · paperflow-pdfs</div>
+            <div style="font-size:10px; color:var(--muted); margin-top:6px; line-height:1.5">Stores uploaded PDFs — survive reboots</div>
+          </div>
+          <div class="svc-card" style="flex:1; border-left-color:#7c3aed;">
+            <div class="sname">🔐 Secret Manager</div>
+            <div class="seq">= AWS Secrets Manager</div>
+            <div style="font-size:10px; color:var(--muted); margin-top:6px; line-height:1.5">OPENAI_API_KEY · POSTGRES_PASSWORD</div>
+          </div>
+          <div class="svc-card" style="flex:1; border-left-color:#34a853;">
+            <div class="sname">📊 Cloud Monitoring</div>
+            <div class="seq">= AWS CloudWatch</div>
+            <div style="font-size:10px; color:var(--muted); margin-top:6px; line-height:1.5">CPU · Memory · Uptime · Alerts</div>
+          </div>
+        </div>
+
+        <!-- OpenAI External -->
+        <div style="border:1px dashed var(--border); border-radius:12px; padding:12px 24px; text-align:center; font-size:12px; color:var(--muted);">
+          🌐 <strong style="color:var(--text)">OpenAI API (External)</strong> · GPT-4o-mini · Chat / Summary / Translate / Q&A
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════ SLIDE 5 — GCP SERVICES ═══════════════════════════════ -->
+  <div class="slide" id="slide-5">
+    <div class="slide-header">
+      <span class="slide-tag">GCP Services Used</span>
+      <span class="slide-title">4 Managed Services · All Within Free Credits</span>
+    </div>
+    <div class="slide-body">
+      <div class="services-grid">
+        <div class="svc-detail">
+          <div class="svc-num">SERVICE 01</div>
+          <div class="svc-name">Compute Engine</div>
+          <div class="svc-aws">= AWS EC2</div>
+          <div class="svc-specs">
+            <div class="svc-spec"><span class="lbl">Machine type</span><span class="val">e2-standard-2</span></div>
+            <div class="svc-spec"><span class="lbl">vCPU / RAM</span><span class="val">2 vCPU · 8 GB</span></div>
+            <div class="svc-spec"><span class="lbl">OS</span><span class="val">Ubuntu 22.04 LTS</span></div>
+            <div class="svc-spec"><span class="lbl">Zone</span><span class="val">us-central1-a</span></div>
+          </div>
+          <div class="svc-cost-badge">~$0.067/hr</div>
+        </div>
+        <div class="svc-detail">
+          <div class="svc-num">SERVICE 02</div>
+          <div class="svc-name">Cloud Storage</div>
+          <div class="svc-aws">= AWS S3</div>
+          <div class="svc-specs">
+            <div class="svc-spec"><span class="lbl">Location</span><span class="val">US-CENTRAL1</span></div>
+            <div class="svc-spec"><span class="lbl">Class</span><span class="val">Standard</span></div>
+            <div class="svc-spec"><span class="lbl">Access</span><span class="val">Private (SA only)</span></div>
+            <div class="svc-spec"><span class="lbl">Purpose</span><span class="val">Stores uploaded PDFs</span></div>
+          </div>
+          <div class="svc-cost-badge">~$0.02/GB/month</div>
+        </div>
+        <div class="svc-detail">
+          <div class="svc-num">SERVICE 03</div>
+          <div class="svc-name">Secret Manager</div>
+          <div class="svc-aws">= AWS Secrets Manager</div>
+          <div class="svc-specs">
+            <div class="svc-spec"><span class="lbl">Secrets</span><span class="val">OPENAI_API_KEY</span></div>
+            <div class="svc-spec"><span class="lbl"></span><span class="val">POSTGRES_PASSWORD</span></div>
+            <div class="svc-spec"><span class="lbl">Access</span><span class="val">VM Service Account</span></div>
+            <div class="svc-spec"><span class="lbl">No .env file</span><span class="val">in code or repo</span></div>
+          </div>
+          <div class="svc-cost-badge">Free &lt; 10K ops/month</div>
+        </div>
+        <div class="svc-detail">
+          <div class="svc-num">SERVICE 04</div>
+          <div class="svc-name">Cloud Monitoring</div>
+          <div class="svc-aws">= AWS CloudWatch</div>
+          <div class="svc-specs">
+            <div class="svc-spec"><span class="lbl">Metrics</span><span class="val">CPU · Memory · Disk</span></div>
+            <div class="svc-spec"><span class="lbl">Uptime</span><span class="val">:3000 + :8000 checks</span></div>
+            <div class="svc-spec"><span class="lbl">Alerts</span><span class="val">CPU &gt; 80%</span></div>
+            <div class="svc-spec"><span class="lbl">Logs</span><span class="val">Log Explorer</span></div>
+          </div>
+          <div class="svc-cost-badge">Free &lt; 5 GB logs/month</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════ SLIDE 6 — STEP BY STEP ═══════════════════════════════ -->
+  <div class="slide" id="slide-6">
+    <div class="slide-header">
+      <span class="slide-tag">Step-by-Step Setup & Demo Day Workflow</span>
+      <span class="slide-title">Click any command to reveal it</span>
+    </div>
+    <div class="slide-body" style="padding-top:16px;">
+      <div class="step-layout">
+        <div class="step-sidebar" id="stepSidebar">
+          <button class="step-btn active" onclick="showStep(0)"><div class="snum">STEP 01</div><div class="stitle">Project & APIs</div></button>
+          <button class="step-btn" onclick="showStep(1)"><div class="snum">STEP 02</div><div class="stitle">Compute Engine</div></button>
+          <button class="step-btn" onclick="showStep(2)"><div class="snum">STEP 03</div><div class="stitle">Cloud Storage</div></button>
+          <button class="step-btn" onclick="showStep(3)"><div class="snum">STEP 04</div><div class="stitle">Secret Manager</div></button>
+          <button class="step-btn" onclick="showStep(4)"><div class="snum">STEP 05</div><div class="stitle">Cloud Monitoring</div></button>
+          <button class="step-btn" onclick="showStep(5)"><div class="snum">STEP 06</div><div class="stitle">Deploy the App</div></button>
+          <button class="step-btn" onclick="showStep(6)"><div class="snum">DEMO DAY</div><div class="stitle">Before / During / After</div></button>
+        </div>
+        <div class="step-content" id="stepContent"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════ SLIDE 7 — COST ═══════════════════════════════ -->
+  <div class="slide" id="slide-7">
+    <div class="slide-header">
+      <span class="slide-tag">Cost Breakdown</span>
+      <span class="slide-title">3-Day Demo · ~$4.82 Total from $300 GCP Credits</span>
+    </div>
+    <div class="slide-body">
+      <div class="cost-grid">
+        <div>
+          <div style="font-size:11px; color:var(--muted); font-family:'Space Mono',monospace; margin-bottom:10px; letter-spacing:1px;">GCP INFRASTRUCTURE (3-DAY)</div>
+          <table class="cost-table">
+            <thead><tr><th>Service</th><th>AWS Equiv.</th><th>Cost</th></tr></thead>
+            <tbody>
+              <tr><td>Compute Engine e2-standard-2</td><td style="color:#ffa500;font-size:11px">EC2 t3.medium</td><td class="price">~$4.80</td></tr>
+              <tr><td>Cloud Storage (few PDFs)</td><td style="color:#ffa500;font-size:11px">S3</td><td class="price">~$0.01</td></tr>
+              <tr><td>Secret Manager (&lt;10K ops)</td><td style="color:#ffa500;font-size:11px">Secrets Mgr</td><td><span class="free-badge">FREE</span></td></tr>
+              <tr><td>Cloud Monitoring (&lt;5 GB logs)</td><td style="color:#ffa500;font-size:11px">CloudWatch</td><td><span class="free-badge">FREE</span></td></tr>
+              <tr><td>Static External IP</td><td style="color:#ffa500;font-size:11px">Elastic IP</td><td class="price">~$0.01</td></tr>
+              <tr><td colspan="2"><strong>Total</strong></td><td class="price">~$4.82</td></tr>
+            </tbody>
+          </table>
+          <div style="margin-top:10px; font-size:12px; color:var(--gcp-green); background:rgba(52,168,83,.08); border-radius:8px; padding:10px 14px;">
+            💳 $300 credits → spend $4.82 → <strong>$295.18 remaining</strong>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:11px; color:var(--muted); font-family:'Space Mono',monospace; margin-bottom:10px; letter-spacing:1px;">OPENAI API (separate from GCP)</div>
+          <table class="cost-table">
+            <thead><tr><th>Operation</th><th>Model</th><th>Per Call</th></tr></thead>
+            <tbody>
+              <tr><td>Chat (RAG)</td><td style="font-size:11px;color:var(--muted)">gpt-4o-mini</td><td class="price">$0.001–0.003</td></tr>
+              <tr><td>Summarize</td><td style="font-size:11px;color:var(--muted)">gpt-4o-mini</td><td class="price">$0.002–0.005</td></tr>
+              <tr><td>Translate</td><td style="font-size:11px;color:var(--muted)">gpt-4o-mini</td><td class="price">$0.002–0.005</td></tr>
+              <tr><td>Q&A Generate</td><td style="font-size:11px;color:var(--muted)">gpt-4o-mini</td><td class="price">$0.002–0.005</td></tr>
+              <tr><td>Agent Discover</td><td style="font-size:11px;color:var(--muted)">gpt-4o-mini</td><td class="price">~$0.001</td></tr>
+              <tr><td colspan="2"><strong>Full test session</strong></td><td class="price">~$0.02–0.05</td></tr>
+            </tbody>
+          </table>
+
+          <div style="margin-top:14px;">
+            <div style="font-size:11px; color:var(--muted); font-family:'Space Mono',monospace; margin-bottom:10px; letter-spacing:1px;">MACHINE TYPE OPTIONS</div>
+            <table class="cost-table">
+              <thead><tr><th>Type</th><th>vCPU/RAM</th><th>Cost/hr</th><th>3-day</th></tr></thead>
+              <tbody>
+                <tr><td>e2-medium</td><td>2 / 4GB</td><td class="price">$0.033</td><td class="price">~$2.40</td></tr>
+                <tr style="background:rgba(26,115,232,.1)"><td><strong style="color:var(--accent)">e2-standard-2 ✅</strong></td><td>2 / 8GB</td><td class="price">$0.067</td><td class="price">~$4.80</td></tr>
+                <tr><td>e2-standard-4</td><td>4 / 16GB</td><td class="price">$0.134</td><td class="price">~$9.70</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="tip-box" style="margin-top:14px;">
+        <div class="tip-title">💡 Cost Saving Tip</div>
+        <p>Run VM only 8 hrs/day across 3 days = 24 hrs total → cost drops to <strong style="color:var(--gcp-green)">~$1.60</strong> instead of $4.80. Always <code style="font-size:11px; background:rgba(0,0,0,.3); padding:1px 6px; border-radius:3px;">stop</code> not <code style="font-size:11px; background:rgba(0,0,0,.3); padding:1px 6px; border-radius:3px;">delete</code> — stopping keeps your data.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════ SLIDE 8 — CLEANUP ═══════════════════════════════ -->
+  <div class="slide" id="slide-8">
+    <div class="slide-header">
+      <span class="slide-tag">Cleanup After Demo</span>
+      <span class="slide-title">Remove All Resources — Avoid Surprise Charges</span>
+    </div>
+    <div class="slide-body">
+      <div style="background:rgba(234,67,53,.06); border:1px solid rgba(234,67,53,.2); border-radius:10px; padding:10px 16px; margin-bottom:16px; font-size:12px; color:#f87171;">
+        ⚠️ Always use <code style="background:rgba(0,0,0,.3); padding:1px 6px; border-radius:3px; font-size:11px;">stop</code> not <code style="background:rgba(0,0,0,.3); padding:1px 6px; border-radius:3px; font-size:11px;">delete</code> during demos — stopping keeps your data. Use delete only for full cleanup.
+      </div>
+      <div class="cleanup-grid">
+        <div class="cleanup-card">
+          <div class="cc-head">🖥 Delete VM</div>
+          <div class="cc-body">
+            <div class="mini-cmd" onclick="copyCmd(this, 'gcloud compute instances delete paperflow-vm --zone=us-central1-a')">
+              gcloud compute instances delete paperflow-vm --zone=us-central1-a
+              <span class="mini-copy">📋</span>
+            </div>
+          </div>
+        </div>
+        <div class="cleanup-card">
+          <div class="cc-head">📍 Delete Static IP</div>
+          <div class="cc-body">
+            <div class="mini-cmd" onclick="copyCmd(this, 'gcloud compute addresses delete paperflow-ip --region=us-central1')">
+              gcloud compute addresses delete paperflow-ip --region=us-central1
+              <span class="mini-copy">📋</span>
+            </div>
+          </div>
+        </div>
+        <div class="cleanup-card">
+          <div class="cc-head">🗑 Delete Storage Bucket</div>
+          <div class="cc-body">
+            <div class="mini-cmd" onclick="copyCmd(this, 'gcloud storage rm -r gs://paperflow-pdfs-demo')">
+              gcloud storage rm -r gs://paperflow-pdfs-demo
+              <span class="mini-copy">📋</span>
+            </div>
+          </div>
+        </div>
+        <div class="cleanup-card">
+          <div class="cc-head">🔐 Delete Secrets</div>
+          <div class="cc-body">
+            <div class="mini-cmd" onclick="copyCmd(this, 'gcloud secrets delete OPENAI_API_KEY')">
+              gcloud secrets delete OPENAI_API_KEY
+              <span class="mini-copy">📋</span>
+            </div>
+            <div class="mini-cmd" onclick="copyCmd(this, 'gcloud secrets delete POSTGRES_PASSWORD')">
+              gcloud secrets delete POSTGRES_PASSWORD
+              <span class="mini-copy">📋</span>
+            </div>
+          </div>
+        </div>
+        <div class="cleanup-card">
+          <div class="cc-head">🔥 Delete Firewall Rules</div>
+          <div class="cc-body">
+            <div class="mini-cmd" onclick="copyCmd(this, 'gcloud compute firewall-rules delete allow-paperflow-frontend')">
+              gcloud compute firewall-rules delete allow-paperflow-frontend
+              <span class="mini-copy">📋</span>
+            </div>
+            <div class="mini-cmd" onclick="copyCmd(this, 'gcloud compute firewall-rules delete allow-paperflow-api')">
+              gcloud compute firewall-rules delete allow-paperflow-api
+              <span class="mini-copy">📋</span>
+            </div>
+          </div>
+        </div>
+        <div class="cleanup-card">
+          <div class="cc-head">✅ Verify Nothing Remains</div>
+          <div class="cc-body">
+            <div class="mini-cmd" onclick="copyCmd(this, 'gcloud compute instances list')">gcloud compute instances list<span class="mini-copy">📋</span></div>
+            <div class="mini-cmd" onclick="copyCmd(this, 'gcloud compute addresses list')">gcloud compute addresses list<span class="mini-copy">📋</span></div>
+            <div class="mini-cmd" onclick="copyCmd(this, 'gcloud secrets list')">gcloud secrets list<span class="mini-copy">📋</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════ SLIDE 9 — TROUBLESHOOTING ═══════════════════════════════ -->
+  <div class="slide" id="slide-9">
+    <div class="slide-header">
+      <span class="slide-tag">Troubleshooting</span>
+      <span class="slide-title">Common Issues & Quick Fixes</span>
+    </div>
+    <div class="slide-body">
+      <table class="trouble-table">
+        <thead><tr><th>Problem</th><th>Diagnose Command</th><th>Fix</th></tr></thead>
+        <tbody>
+          <tr><td>VM won't start</td><td>gcloud compute instances describe paperflow-vm --zone=us-central1-a</td><td>Check quota in us-central1</td></tr>
+          <tr><td>Can't reach :3000 or :8000</td><td>gcloud compute firewall-rules list</td><td>Re-run firewall-rules create commands</td></tr>
+          <tr><td>Container keeps restarting</td><td>docker compose logs gateway --tail 50</td><td>Check OPENAI_API_KEY is set in .env</td></tr>
+          <tr><td>Secret not found</td><td>gcloud secrets list</td><td>Re-run secret create command</td></tr>
+          <tr><td>Permission denied on bucket</td><td>gcloud projects get-iam-policy YOUR_PROJECT_ID</td><td>Re-run storage IAM binding command</td></tr>
+          <tr><td>Static IP changed</td><td>gcloud compute addresses describe paperflow-ip --region=us-central1</td><td>You used delete instead of stop</td></tr>
+          <tr><td>Out of disk space</td><td>df -h (on VM)</td><td>Run: docker system prune -a</td></tr>
+          <tr><td>Build takes too long</td><td>Normal on first run</td><td>Pre-build the night before demo</td></tr>
+        </tbody>
+      </table>
+
+      <div style="margin-top:20px;">
+        <div style="font-size:11px; color:var(--muted); font-family:'Space Mono',monospace; margin-bottom:12px; letter-spacing:1px;">MOST USEFUL DEBUG COMMANDS (run on VM)</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <div class="mini-cmd" onclick="copyCmd(this, 'docker compose ps')" style="border-radius:8px; padding:10px 14px; font-size:11px;">docker compose ps<span class="mini-copy" style="opacity:1">📋</span></div>
+          <div class="mini-cmd" onclick="copyCmd(this, 'docker compose logs -f')" style="border-radius:8px; padding:10px 14px; font-size:11px;">docker compose logs -f<span class="mini-copy" style="opacity:1">📋</span></div>
+          <div class="mini-cmd" onclick="copyCmd(this, 'docker compose logs gateway -f')" style="border-radius:8px; padding:10px 14px; font-size:11px;">docker compose logs gateway -f<span class="mini-copy" style="opacity:1">📋</span></div>
+          <div class="mini-cmd" onclick="copyCmd(this, 'docker compose restart gateway')" style="border-radius:8px; padding:10px 14px; font-size:11px;">docker compose restart gateway<span class="mini-copy" style="opacity:1">📋</span></div>
+          <div class="mini-cmd" onclick="copyCmd(this, 'docker compose down -v')" style="border-radius:8px; padding:10px 14px; font-size:11px;">docker compose down -v<span class="mini-copy" style="opacity:1">📋</span></div>
+          <div class="mini-cmd" onclick="copyCmd(this, 'docker system prune -a')" style="border-radius:8px; padding:10px 14px; font-size:11px;">docker system prune -a<span class="mini-copy" style="opacity:1">📋</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════ SLIDE 10 — QUICK REF ═══════════════════════════════ -->
+  <div class="slide" id="slide-10">
+    <div class="slide-header">
+      <span class="slide-tag">Quick Reference</span>
+      <span class="slide-title">All Commands at a Glance</span>
+    </div>
+    <div class="slide-body">
+      <div class="qref-grid">
+        <div class="qref-section">
+          <h4>☁ From Your Local Machine</h4>
+          <div class="qref-row" onclick="copyText('gcloud auth login')"><span class="action">Login to GCP</span><span class="qcmd">gcloud auth login</span></div>
+          <div class="qref-row" onclick="copyText('gcloud config set project YOUR_PROJECT_ID')"><span class="action">Set project</span><span class="qcmd">gcloud config set project YOUR_PROJECT_ID</span></div>
+          <div class="qref-row" onclick="copyText('gcloud compute addresses create paperflow-ip --region=us-central1')"><span class="action">Create static IP</span><span class="qcmd">gcloud compute addresses create paperflow-ip...</span></div>
+          <div class="qref-row" onclick="copyText('gcloud compute instances create paperflow-vm --zone=us-central1-a --machine-type=e2-standard-2 --image-family=ubuntu-2204-lts --image-project=ubuntu-os-cloud --boot-disk-size=50GB --address=paperflow-ip --tags=paperflow-server --scopes=cloud-platform')"><span class="action">Create VM</span><span class="qcmd">gcloud compute instances create paperflow-vm...</span></div>
+          <div class="qref-row" onclick="copyText('gcloud compute ssh paperflow-vm --zone=us-central1-a')"><span class="action">SSH into VM</span><span class="qcmd">gcloud compute ssh paperflow-vm --zone=us-central1-a</span></div>
+          <div class="qref-row" onclick="copyText('gcloud compute instances start paperflow-vm --zone=us-central1-a')"><span class="action">Start VM</span><span class="qcmd">gcloud compute instances start paperflow-vm...</span></div>
+          <div class="qref-row" onclick="copyText('gcloud compute instances stop paperflow-vm --zone=us-central1-a')"><span class="action">Stop VM</span><span class="qcmd">gcloud compute instances stop paperflow-vm...</span></div>
+          <div class="qref-row" onclick="copyText('gcloud compute instances list')"><span class="action">List VMs</span><span class="qcmd">gcloud compute instances list</span></div>
+        </div>
+        <div class="qref-section">
+          <h4>🖥 Inside the VM</h4>
+          <div class="qref-row" onclick="copyText('docker compose up -d')"><span class="action">Start all containers</span><span class="qcmd">docker compose up -d</span></div>
+          <div class="qref-row" onclick="copyText('docker compose down')"><span class="action">Stop all containers</span><span class="qcmd">docker compose down</span></div>
+          <div class="qref-row" onclick="copyText('docker compose ps')"><span class="action">Check container health</span><span class="qcmd">docker compose ps</span></div>
+          <div class="qref-row" onclick="copyText('docker compose logs -f')"><span class="action">Watch logs live</span><span class="qcmd">docker compose logs -f</span></div>
+          <div class="qref-row" onclick="copyText('docker compose restart gateway')"><span class="action">Restart gateway</span><span class="qcmd">docker compose restart gateway</span></div>
+          <div class="qref-row" onclick="copyText('docker compose up --build -d')"><span class="action">Rebuild everything</span><span class="qcmd">docker compose up --build -d</span></div>
+          <div class="qref-row" onclick="copyText('docker system prune -a')"><span class="action">Free disk space</span><span class="qcmd">docker system prune -a</span></div>
+          <div class="qref-row" onclick="copyText('watch -n 3 docker compose ps')"><span class="action">Monitor containers</span><span class="qcmd">watch -n 3 docker compose ps</span></div>
+        </div>
+      </div>
+      <div style="margin-top:14px; text-align:center; font-size:11px; color:var(--muted); font-family:'Space Mono',monospace;">
+        Click any row to copy the command to clipboard
+      </div>
+    </div>
+  </div>
+
+</div><!-- /deck -->
+
+<!-- NAV -->
+<div class="nav">
+  <button onclick="prevSlide()">◀</button>
+  <div class="dots" id="dots"></div>
+  <span class="counter" id="counter">1 / 10</span>
+  <button onclick="nextSlide()">▶</button>
+</div>
+
+<script>
+// ──── STEP DATA ────
+const steps = [
+  {
+    title: "Step 1 — Project & APIs",
+    desc: "Login to GCP, set your project, and enable all required service APIs.",
+    commands: [
+      { label: "Login to GCP", cmd: "gcloud auth login" },
+      { label: "Set your project", cmd: "gcloud config set project YOUR_PROJECT_ID" },
+      { label: "Enable Compute API", cmd: "gcloud services enable compute.googleapis.com" },
+      { label: "Enable Storage API", cmd: "gcloud services enable storage.googleapis.com" },
+      { label: "Enable Secret Manager API", cmd: "gcloud services enable secretmanager.googleapis.com" },
+      { label: "Enable Monitoring API", cmd: "gcloud services enable monitoring.googleapis.com" },
+      { label: "Enable Logging API", cmd: "gcloud services enable logging.googleapis.com" },
+    ]
+  },
+  {
+    title: "Step 2 — Compute Engine (= EC2)",
+    desc: "Create a static external IP, launch the VM, and open required ports for frontend and API.",
+    commands: [
+      { label: "Create static external IP", cmd: "gcloud compute addresses create paperflow-ip \\\n  --region=us-central1" },
+      { label: "Check your static IP value", cmd: 'gcloud compute addresses describe paperflow-ip \\\n  --region=us-central1 \\\n  --format="get(address)"' },
+      { label: "Create the VM", cmd: "gcloud compute instances create paperflow-vm \\\n  --zone=us-central1-a \\\n  --machine-type=e2-standard-2 \\\n  --image-family=ubuntu-2204-lts \\\n  --image-project=ubuntu-os-cloud \\\n  --boot-disk-size=50GB \\\n  --address=paperflow-ip \\\n  --tags=paperflow-server \\\n  --scopes=cloud-platform", note: "--scopes=cloud-platform allows the VM to talk to Cloud Storage, Secret Manager, and Monitoring automatically." },
+      { label: "Open port 3000 (Frontend)", cmd: "gcloud compute firewall-rules create allow-paperflow-frontend \\\n  --allow=tcp:3000 \\\n  --target-tags=paperflow-server \\\n  --description=\"PaperFlow frontend port\"" },
+      { label: "Open port 8000 (API / Swagger)", cmd: "gcloud compute firewall-rules create allow-paperflow-api \\\n  --allow=tcp:8000 \\\n  --target-tags=paperflow-server \\\n  --description=\"PaperFlow API port\"" },
+      { label: "Verify VM is running", cmd: "gcloud compute instances list" },
+    ]
+  },
+  {
+    title: "Step 3 — Cloud Storage (= S3)",
+    desc: "Create a globally unique storage bucket and grant the VM's service account write access.",
+    commands: [
+      { label: "Create the storage bucket", cmd: "gcloud storage buckets create gs://paperflow-pdfs-demo \\\n  --location=US-CENTRAL1 \\\n  --uniform-bucket-level-access" },
+      { label: "Get your project number", cmd: 'gcloud projects describe YOUR_PROJECT_ID \\\n  --format="get(projectNumber)"' },
+      { label: "Give the VM read/write access", cmd: "gcloud storage buckets add-iam-policy-binding \\\n  gs://paperflow-pdfs-demo \\\n  --member=\"serviceAccount:YOUR_PROJECT_NUMBER-compute@developer.gserviceaccount.com\" \\\n  --role=\"roles/storage.objectAdmin\"", note: "Replace YOUR_PROJECT_NUMBER with the number from the previous command." },
+      { label: "Test upload from VM", cmd: "echo \"test\" > test.txt && gcloud storage cp test.txt gs://paperflow-pdfs-demo/" },
+      { label: "List bucket contents", cmd: "gcloud storage ls gs://paperflow-pdfs-demo/" },
+    ]
+  },
+  {
+    title: "Step 4 — Secret Manager (= AWS Secrets Manager)",
+    desc: "Store API keys and passwords securely — no .env files in code or repositories.",
+    commands: [
+      { label: "Store your OpenAI API key", cmd: "echo -n \"sk-your-real-openai-key-here\" | \\\n  gcloud secrets create OPENAI_API_KEY \\\n  --data-file=- \\\n  --replication-policy=automatic" },
+      { label: "Store your Postgres password", cmd: "echo -n \"your-strong-db-password\" | \\\n  gcloud secrets create POSTGRES_PASSWORD \\\n  --data-file=- \\\n  --replication-policy=automatic" },
+      { label: "Verify secrets are stored", cmd: "gcloud secrets list" },
+      { label: "Grant VM access to OPENAI_API_KEY", cmd: "gcloud secrets add-iam-policy-binding OPENAI_API_KEY \\\n  --member=\"serviceAccount:YOUR_PROJECT_NUMBER-compute@developer.gserviceaccount.com\" \\\n  --role=\"roles/secretmanager.secretAccessor\"" },
+      { label: "Grant VM access to POSTGRES_PASSWORD", cmd: "gcloud secrets add-iam-policy-binding POSTGRES_PASSWORD \\\n  --member=\"serviceAccount:YOUR_PROJECT_NUMBER-compute@developer.gserviceaccount.com\" \\\n  --role=\"roles/secretmanager.secretAccessor\"" },
+      { label: "Test fetching a secret (on VM)", cmd: "gcloud secrets versions access latest --secret=\"OPENAI_API_KEY\"" },
+    ]
+  },
+  {
+    title: "Step 5 — Cloud Monitoring (= CloudWatch)",
+    desc: "Set up uptime checks for both the frontend and API endpoints.",
+    commands: [
+      { label: "Get your static IP for checks", cmd: 'gcloud compute addresses describe paperflow-ip \\\n  --region=us-central1 \\\n  --format="get(address)"' },
+      { label: "Create uptime check for frontend (:3000)", cmd: "gcloud monitoring uptime create \\\n  --display-name=\"PaperFlow Frontend Check\" \\\n  --http-check-path=\"/\" \\\n  --port=3000 \\\n  --hostname=YOUR_STATIC_IP" },
+      { label: "Create uptime check for API (:8000)", cmd: "gcloud monitoring uptime create \\\n  --display-name=\"PaperFlow API Check\" \\\n  --http-check-path=\"/docs\" \\\n  --port=8000 \\\n  --hostname=YOUR_STATIC_IP" },
+      { label: "View live metrics (browser)", cmd: "console.cloud.google.com → Monitoring → Dashboards" },
+      { label: "View all logs (browser)", cmd: "console.cloud.google.com → Logging → Log Explorer" },
+      { label: "Filter logs by VM", cmd: "resource.type=\"gce_instance\" AND resource.labels.instance_id=\"paperflow-vm\"" },
+    ]
+  },
+  {
+    title: "Step 6 — Deploy the App",
+    desc: "SSH into the VM, install Docker, fetch secrets, clone the repo, and start all 5 containers.",
+    commands: [
+      { label: "SSH into the VM", cmd: "gcloud compute ssh paperflow-vm --zone=us-central1-a" },
+      { label: "Update system packages", cmd: "sudo apt update && sudo apt upgrade -y" },
+      { label: "Install Docker", cmd: "curl -fsSL https://get.docker.com | sh" },
+      { label: "Add user to Docker group", cmd: "sudo usermod -aG docker $USER && newgrp docker" },
+      { label: "Verify Docker installed", cmd: "docker --version && docker compose version" },
+      { label: "Fetch OpenAI key from Secret Manager", cmd: "export OPENAI_API_KEY=$(gcloud secrets versions access latest --secret=\"OPENAI_API_KEY\")" },
+      { label: "Fetch Postgres password from Secret Manager", cmd: "export POSTGRES_PASSWORD=$(gcloud secrets versions access latest --secret=\"POSTGRES_PASSWORD\")" },
+      { label: "Clone the repository", cmd: "git clone https://github.com/Abdelhady-22/Paper_Flow.ai.git" },
+      { label: "Enter project directory", cmd: "cd Paper_Flow.ai" },
+      { label: "Inject keys and build containers", cmd: "cp .env.local-openai .env\nsed -i \"s|OPENAI_API_KEY=.*|OPENAI_API_KEY=${OPENAI_API_KEY}|\" .env\nsed -i \"s|POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=${POSTGRES_PASSWORD}|\" .env\ndocker compose up --build -d", note: "First build takes 10–15 minutes. All subsequent starts take seconds." },
+      { label: "Watch container health", cmd: "watch -n 3 docker compose ps" },
+      { label: "Test the app is reachable", cmd: "curl http://localhost:3000\ncurl http://localhost:8000/docs" },
+    ]
+  },
+  {
+    title: "Demo Day Workflow",
+    desc: "Commands to start, monitor, and safely stop your demo — before, during, and after.",
+    commands: [
+      { label: "▶ BEFORE — Start the VM", cmd: "gcloud compute instances start paperflow-vm --zone=us-central1-a" },
+      { label: "▶ BEFORE — SSH into the VM", cmd: "gcloud compute ssh paperflow-vm --zone=us-central1-a" },
+      { label: "▶ BEFORE — Start all containers", cmd: "cd Paper_Flow.ai && docker compose up -d" },
+      { label: "▶ BEFORE — Monitor health", cmd: "watch -n 3 docker compose ps" },
+      { label: "🎤 DURING — Live logs (2nd terminal)", cmd: "docker compose logs -f gateway" },
+      { label: "🎤 DURING — Check all containers", cmd: "docker compose ps" },
+      { label: "🎤 DURING — CPU usage on VM", cmd: "top" },
+      { label: "⏹ AFTER — Stop containers", cmd: "docker compose down" },
+      { label: "⏹ AFTER — Stop VM (no charges)", cmd: "gcloud compute instances stop paperflow-vm --zone=us-central1-a", note: "Use stop not delete — stopping keeps your data." },
+    ]
+  }
+];
+
+// ──── STEP RENDERER ────
+let currentStep = 0;
+function showStep(idx) {
+  currentStep = idx;
+  const btns = document.querySelectorAll('.step-btn');
+  btns.forEach((b, i) => b.classList.toggle('active', i === idx));
+  renderStep(steps[idx]);
+}
+
+function renderStep(step) {
+  const el = document.getElementById('stepContent');
+  let html = `<div class="step-desc">${step.desc}</div><div class="step-commands">`;
+  step.commands.forEach((c, i) => {
+    html += `<div class="cmd-block">
+      <div class="cmd-label">
+        <span>${c.label}</span>
+        <button class="copy-btn" onclick="copyFromBlock(this, \`${c.cmd.replace(/`/g,'\\`')}\`)">copy</button>
+      </div>
+      <button class="cmd-reveal-btn" onclick="toggleCmd(this)">
+        <span class="icon2">▶</span> Click to reveal command
+      </button>
+      <div class="cmd-code">${escHtml(c.cmd)}</div>
+      ${c.note ? `<div class="cmd-note">ℹ️ ${c.note}</div>` : ''}
+    </div>`;
+  });
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+function toggleCmd(btn) {
+  const code = btn.nextElementSibling;
+  const visible = code.classList.toggle('visible');
+  btn.querySelector('.icon2').textContent = visible ? '▼' : '▶';
+  btn.querySelector('.cmd-reveal-btn, span').textContent;
+  if (visible) {
+    btn.innerHTML = '<span class="icon2">▼</span> Command revealed — click to hide';
+  } else {
+    btn.innerHTML = '<span class="icon2">▶</span> Click to reveal command';
+  }
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function copyFromBlock(btn, cmd) {
+  navigator.clipboard.writeText(cmd).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = 'copied!';
+    btn.classList.add('copy-success');
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove('copy-success'); }, 1500);
+  });
+}
+
+function copyCmd(el, cmd) {
+  navigator.clipboard.writeText(cmd).then(() => {
+    const span = el.querySelector('.mini-copy');
+    if (span) { span.textContent = '✓'; setTimeout(() => span.textContent = '📋', 1500); }
+  });
+}
+
+function copyText(cmd) {
+  navigator.clipboard.writeText(cmd).then(() => {
+    const toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#34a853;color:#fff;padding:8px 20px;border-radius:8px;font-size:12px;font-family:Space Mono,monospace;z-index:9999;animation:fadeIn .2s ease';
+    toast.textContent = 'Copied!';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 1500);
+  });
+}
+
+// ──── SLIDE NAV ────
+const totalSlides = 10;
+let current = 1;
+
+function updateNav() {
+  document.getElementById('counter').textContent = `${current} / ${totalSlides}`;
+  document.getElementById('progressBar').style.width = `${(current / totalSlides) * 100}%`;
+  const dots = document.querySelectorAll('.dot');
+  dots.forEach((d, i) => d.classList.toggle('active', i + 1 === current));
+}
+
+function goTo(n) {
+  document.querySelectorAll('.slide').forEach(s => s.classList.remove('active'));
+  document.getElementById('slide-' + n).classList.add('active');
+  current = n;
+  updateNav();
+}
+
+function nextSlide() { if (current < totalSlides) goTo(current + 1); }
+function prevSlide() { if (current > 1) goTo(current - 1); }
+
+// Build dots
+const dotsEl = document.getElementById('dots');
+for (let i = 1; i <= totalSlides; i++) {
+  const d = document.createElement('div');
+  d.className = 'dot' + (i === 1 ? ' active' : '');
+  d.onclick = () => goTo(i);
+  dotsEl.appendChild(d);
+}
+
+// Keyboard nav
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') nextSlide();
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') prevSlide();
+});
+
+// Init
+updateNav();
+renderStep(steps[0]);
+</script>
+</body>
+</html>
